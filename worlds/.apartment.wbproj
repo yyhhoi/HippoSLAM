@@ -1,0 +1,20 @@
+Webots Project File version R2023b
+perspectives: 000000ff00000000fd000000020000000100000126000002d2fc0200000001fb0000001400540065007800740045006400690074006f0072010000001a000002d20000004200ffffff0000000300000780000000d8fc0100000001fb0000001a0043006f006e0073006f006c00650041006c006c0041006c006c0100000000000007800000006900ffffff00000658000002d200000001000000020000000100000008fc00000000
+simulationViewPerspectives: 000000ff000000010000000200000176000006080100000002010000000100
+sceneTreePerspectives: 000000ff00000001000000030000002200000294000000fa0100000002010000000200
+maximizedDockId: -1
+centralWidgetVisible: 1
+orthographicViewHeight: 1
+textFiles: -1
+globalOptionalRendering: DistanceSensorRays::CameraFrustums
+consoles: Console:All:All
+renderingDevicePerspectives: Rosbot:camera depth;0;0.856348;0.0870535;0.0438729
+renderingDevicePerspectives: Rosbot:camera rgb;0;0.895833;0;0
+renderingDevicePerspectives: e-puck:camera;1;1;0;0
+renderingDevicePerspectives: robot:camera;0;0.573438;0;0
+renderingDevicePerspectives: robot:display;0;0.516892;0;0.421046
+renderingDevicePerspectives: robot:range-finder;0;0.748047;0;0
+renderingDevicePerspectives: rosbot:camera depth;0;0.65625;0;0
+renderingDevicePerspectives: rosbot:camera rgb;0;0.895833;0;0
+renderingDevicePerspectives: rosbot:camera(1);0;0.895833;0;0
+renderingDevicePerspectives: television:display;0;2.01563;0;0

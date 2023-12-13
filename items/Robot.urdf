@@ -1,0 +1,156 @@
+<?xml version="1.0"?>
+<robot name="C:/Users/yyhho/Dropbox/navigation/items/Robot.urdf" xmlns:xacro="http://ros.org/wiki/xacro">
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <box size="0.05 0.05 1.6"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.05 0.05 1.6"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="wheel4" type="continuous">
+    <parent link="base_link"/>
+    <child link="solid4"/>
+    <axis xyz="0 -0.000004 -1"/>
+    <limit effort="10" velocity="10"/>
+    <origin xyz="-0.05 -0.06 -0.8" rpy="1.5708 0 0"/>
+  </joint>
+  <link name="solid4">
+    <visual>
+      <geometry>
+        <cylinder radius="0.04" length="0.02"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder radius="0.04" length="0.02"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="wheel3" type="continuous">
+    <parent link="base_link"/>
+    <child link="solid3"/>
+    <axis xyz="0 -0.000004 -1"/>
+    <limit effort="10" velocity="10"/>
+    <origin xyz="-0.05 0.06 -0.8" rpy="1.5708 0 0"/>
+  </joint>
+  <link name="solid3">
+    <visual>
+      <geometry>
+        <cylinder radius="0.04" length="0.02"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder radius="0.04" length="0.02"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="wheel2" type="continuous">
+    <parent link="base_link"/>
+    <child link="solid2"/>
+    <axis xyz="0 -0.000004 -1"/>
+    <limit effort="10" velocity="10"/>
+    <origin xyz="0.05 -0.06 -0.8" rpy="1.5708 0 0"/>
+  </joint>
+  <link name="solid2">
+    <visual>
+      <geometry>
+        <cylinder radius="0.04" length="0.02"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder radius="0.04" length="0.02"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="wheel1" type="continuous">
+    <parent link="base_link"/>
+    <child link="solid"/>
+    <axis xyz="0 -0.000004 -1"/>
+    <limit effort="10" velocity="10"/>
+    <origin xyz="0.05 0.06 -0.8" rpy="1.5708 0 0"/>
+  </joint>
+  <link name="solid">
+    <visual>
+      <geometry>
+        <cylinder radius="0.04" length="0.02"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder radius="0.04" length="0.02"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="ds_right">
+    <visual>
+      <geometry>
+        <box size="0.01 0.01 0.01"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.01 0.01 0.01"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="base_link_ds_right_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="ds_right"/>
+    <origin xyz="0.11 -0.025 0" rpy="0 0 -0.3"/>
+  </joint>
+  <link name="ds_left">
+    <visual>
+      <geometry>
+        <box size="0.01 0.01 0.01"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.01 0.01 0.01"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="base_link_ds_left_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="ds_left"/>
+    <origin xyz="0.11 0.025 0" rpy="0 0 0.3"/>
+  </joint>
+  <link name="camera_box">
+    <visual>
+      <geometry>
+        <box size="0.02 0.02 0.02"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.02 0.02 0.02"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="base_link_camera_box_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="camera_box"/>
+    <origin xyz="0 0 0.94" rpy="0 0 0.000001"/>
+  </joint>
+  <link name="camera">
+  </link>
+  <joint name="camera_box_camera_joint" type="fixed">
+    <parent link="camera_box"/>
+    <child link="camera"/>
+    <origin xyz="0 0 0" rpy="-1.570796 0 -1.570796"/>
+  </joint>
+  <link name="display">
+  </link>
+  <joint name="camera_box_display_joint" type="fixed">
+    <parent link="camera_box"/>
+    <child link="display"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+</robot>
