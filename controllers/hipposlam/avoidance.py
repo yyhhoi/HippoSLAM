@@ -11,7 +11,7 @@ from controller import Robot, Display, Supervisor
 import numpy as np
 
 # Project tags and paths
-save_tag = True
+save_tag = False
 project_tag = 'avoidance'
 save_dir = join('data', project_tag)
 os.makedirs(save_dir, exist_ok=True)
