@@ -11,7 +11,7 @@ from controller import Robot, Display, Supervisor
 import numpy as np
 
 # Project tags and paths
-save_tag = False
+save_tag = True
 project_tag = 'avoidance'
 save_dir = join('data', project_tag)
 os.makedirs(save_dir, exist_ok=True)
@@ -78,8 +78,8 @@ STUCK_LR_counter = 0
 STUCK_LR_thresh = 1000
 
 # Change-direction (CHANGEDIR)
-CHANGEDIR_count = np.array([0, 0])
-CHANGEDIR_thresh = np.array([30, 30])
+CHANGEDIR_count = 0
+CHANGEDIR_thresh = 5e3  # every 5s
 CHANGEDIR_mat = np.array([
     [1, -1],  # Avoidance speed coefficients
     [-0.3, -0.6]  # STUCK recuse speed coefficients
@@ -108,12 +108,13 @@ data = dict(
 )
 
 # Get position of feature nodes
-obj_node = robot.getFromId(2919)
-obj_pos = obj_node.getPosition()
-obj_tpyename = obj_node.getTypeName()
-print(obj_tpyename, obj_pos)
+# obj_node = robot.getFromId(2919)
+# obj_pos = obj_node.getPosition()
+# obj_tpyename = obj_node.getTypeName()
+# print(obj_tpyename, obj_pos)
 
 
+pos_dict = dict()
 
 while True:
     sim_state = robot.step(timestep)
@@ -126,13 +127,9 @@ while True:
             save_pickle(save_pth, data)
             print('Traj data saved at ' + save_pth)
 
-            # meta data
-            meta = dict(stored_f=seq.stored_f, pos=dict())
-            for key in seq.stored_f.keys():
-                obj_node = robot.getFromId(key)
-                meta[pos][key] = obj_node.getPosition()
+            meta = dict(stored_f=seq.stored_f, pos=pos_dict)
             save_pth = join(save_dir, 'meta.pickle')
-            save_pickle(save_pth, data)
+            save_pickle(save_pth, meta)
             print('Meta data saved at ' + save_pth)
 
 
@@ -209,17 +206,21 @@ while True:
 
 
     # CHANGEDIR behaviour
-    for i in range(2):
-        if CHANGEDIR_count[i] > CHANGEDIR_thresh[i]:
-            
-            np.random.seed(global_count)
-            randvec = np.random.permutation(2)
-            CHANGEDIR_mat[i, :] = CHANGEDIR_mat[i, :][randvec]
-            CHANGEDIR_count[i] = 0
-            np.random.seed(global_count)
-            CHANGEDIR_thresh[i] = np.random.randint(10, 100)
-            # print('Change behaviour %d!, new mat\n'%(i), CHANGEDIR_mat)
-            # print('New Thresh = ', CHANGEDIR_thresh)
+    if CHANGEDIR_count > CHANGEDIR_thresh:
+        np.random.seed(global_count)
+        negval = np.random.uniform(-1, 0)
+        np.random.seed(global_count + 1)
+        posval = np.random.uniform(0, 1)
+        avoidance_vals = np.array([posval, negval])
+        np.random.seed(global_count + 2)
+        avoidance_vals = avoidance_vals[np.random.permutation(2)]
+        np.random.seed(global_count + 3)
+        stuck_negvals = np.random.uniform(-1, -0.1, size=2)
+        CHANGEDIR_mat = np.vstack([avoidance_vals, stuck_negvals])
+        CHANGEDIR_count = 0
+    else:
+        np.random.seed(global_count)
+        CHANGEDIR_count += np.random.randint(10, 100)
 
     # Theta
     timediff = timeCounter - timeCounter2
@@ -236,6 +237,13 @@ while True:
         data["a"].append(angle)
         data["objID"].append(idlist)
         data["X"].append(seq.X)
+
+        for key in seq.stored_f.keys():
+            if key not in pos_dict:
+                obj_node = robot.getFromId(key)
+                pos = obj_node.getPosition()
+                pos_dict[key] = pos
+                print('Insert Id=%d with position '%(key), pos)
 
         timeCounter2 = timeCounter
         pass
