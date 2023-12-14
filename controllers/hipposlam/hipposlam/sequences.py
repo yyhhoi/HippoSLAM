@@ -2,7 +2,7 @@ import numpy as np
 
 
 class Sequences:
-    def __init__(self, R: int, L: int):
+    def __init__(self, R: int, L: int, reobserve: bool = True):
         self.R = R
         self.L = L
         self.X_Ncol = R + L - 1
@@ -12,6 +12,7 @@ class Sequences:
         self.current_f = []
         self.num_f = 0
         self.iter = 0
+        self.reobserve = reobserve
 
     def step(self, f: list):
         self.clear_end_state()
@@ -25,13 +26,14 @@ class Sequences:
             stored_f_keys = self.stored_f.keys()
             if (f_each in stored_f_keys) and (f_each in self.current_f):
                 # The stored feature node is still in the view.
-                self.f_sigma[f_each].append(0)  # Sigma stars with 0 because of the self.propagate_sigma() function.
-                pass
+                if self.reobserve:
+                    self.f_sigma[f_each].append(0)  # Sigma stars with 0 because of the self.propagate_sigma() function.
+
             elif (f_each in stored_f_keys) and (f_each not in self.current_f):
                 # The feature node exited the view before and now re-enters
                 # Start a new instance of the feature node
                 self.f_sigma[f_each].append(0)
-                pass
+
             elif f_each not in self.stored_f.keys():
                 # A new feature node is found
                 self.stored_f[f_each] = self.num_f

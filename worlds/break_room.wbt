@@ -32,8 +32,8 @@ WorldInfo {
   title "Break Room"
 }
 Viewpoint {
-  orientation -0.5773502691896258 0.5773502691896258 0.5773502691896258 2.0944
-  position 1.9876268573838591 1.2934978462211548 27.857098336269438
+  orientation -0.3798940863791232 0.3654524930104746 0.8497793587082474 1.770987939471812
+  position -0.3858078130824259 -9.935232706227048 15.03911286784569
 }
 TexturedBackground {
   texture "entrance_hall"
@@ -76,20 +76,6 @@ Wall {
   rotation 0 0 1 1.5708
   name "wall(2)"
   size 0.05 5.35 0.62
-  appearance USE SMALL_WALLS
-}
-Wall {
-  translation -1.65 2.524 0
-  rotation 0 0 1 1.5708
-  name "wall(3)"
-  size 0.05 2.05 1.6
-  appearance USE SMALL_WALLS
-}
-Wall {
-  translation 1.876 2.524 0
-  rotation 0 0 1 1.5708
-  name "wall(6)"
-  size 0.05 3 1.6
   appearance USE SMALL_WALLS
 }
 Wall {
@@ -258,7 +244,7 @@ Wall {
   size 0.06 5.7 2.5
 }
 Sofa {
-  translation -2.06001 0.320018 0
+  translation -2.06001 -0.439982 0
   rotation 0 0 1 -5.307179586466759e-06
 }
 PottedTree {
@@ -269,8 +255,16 @@ PottedTree {
   name "potted tree(3)"
 }
 PottedTree {
-  translation 1.83 2.84 0
+  translation 0.58 1.61 0
   name "potted tree(1)"
+}
+PottedTree {
+  translation 0.16 1.74 0
+  name "potted tree(6)"
+}
+PottedTree {
+  translation 0.33 1.32 0
+  name "potted tree(5)"
 }
 PottedTree {
   translation 5.2 4.47 0
@@ -281,8 +275,8 @@ PottedTree {
   name "potted tree(2)"
 }
 Cabinet {
-  translation 0.910034 2.45 0
-  rotation 0 0 1 -1.5708053071795867
+  translation -2.60997 1.54 0
+  rotation 0 0 -1 8.98519e-06
   outerThickness 0.02
   rowsHeights [
     0.3, 0.4, 0.3, 0.3
@@ -1239,7 +1233,7 @@ DEF AGENT Robot {
       }
     }
     Solid {
-      translation 5.15213e-15 1.74204e-21 1.51
+      translation 5.15213e-15 1.74204e-21 1.55
       rotation 0 0 1 1.01503e-06
       children [
         Display {
@@ -1247,9 +1241,9 @@ DEF AGENT Robot {
           height 10
         }
         Camera {
-          fieldOfView 1.04
+          fieldOfView 2.356
           width 640
-          height 480
+          height 240
           recognition Recognition {
             segmentation TRUE
           }

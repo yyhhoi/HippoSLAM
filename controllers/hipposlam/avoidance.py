@@ -12,7 +12,8 @@ import numpy as np
 
 # Project tags and paths
 save_tag = True
-project_tag = 'avoidance'
+reobserve = False
+project_tag = 'avoidance_NoReObserve'
 save_dir = join('data', project_tag)
 os.makedirs(save_dir, exist_ok=True)
 
@@ -28,9 +29,10 @@ thetastep = 128
 print('Basic time step = %d ms, Theta time step = %d ms'%(timestep, thetastep))
 
 # Get Camera
+camera_timestep = 64
 cam = robot.getDevice('camera')
-cam.enable(timestep)
-cam.recognitionEnable(timestep)
+cam.enable(camera_timestep)
+cam.recognitionEnable(camera_timestep)
 # cam.enableRecognitionSegmentation()
 width = cam.getWidth()
 height = cam.getHeight()
@@ -86,7 +88,7 @@ CHANGEDIR_mat = np.array([
 ])
 
 # HippoSLAM
-seq = Sequences(R=5, L=10)
+seq = Sequences(R=5, L=10, reobserve=reobserve)
 
 # Other parameters
 base_speed = 15
@@ -94,6 +96,9 @@ timeCounter = 0
 timeCounter2 = 0
 global_count = 0
 navmodes = [True, False]  # [Obstacle avoidance, Stuck recuse]
+floor_diag = (7.7 **2 + 12.9 ** 2) ** (1/2)
+dist_sep = floor_diag / 7
+
 
 # Data Storage
 data = dict(
@@ -103,18 +108,13 @@ data = dict(
     z = [],
     a = [],
     objID = [],
+    objID_dist= [],
+    f_sigma=[],
     X = [],
 
 )
 
-# Get position of feature nodes
-# obj_node = robot.getFromId(2919)
-# obj_pos = obj_node.getPosition()
-# obj_tpyename = obj_node.getTypeName()
-# print(obj_tpyename, obj_pos)
-
-
-pos_dict = dict()
+fpos_dict = dict()
 
 while True:
     sim_state = robot.step(timestep)
@@ -127,7 +127,7 @@ while True:
             save_pickle(save_pth, data)
             print('Traj data saved at ' + save_pth)
 
-            meta = dict(stored_f=seq.stored_f, pos=pos_dict)
+            meta = dict(stored_f=seq.stored_f, fpos=fpos_dict, dist_level=dist_level)
             save_pth = join(save_dir, 'meta.pickle')
             save_pickle(save_pth, meta)
             print('Meta data saved at ' + save_pth)
@@ -145,27 +145,8 @@ while True:
 
     # Obstacle avoidance
     if navmodes[0]:
-        # left_blocked = ds_vals[0] < OA_dsThresh
-        # right_blocked = ds_vals[2] < OA_dsThresh
         blocked = np.any(ds_vals[[0, 1, 2, 3, 11]] < OA_dsThresh)
-        # # print(ds_vals)
-        # if left_blocked and right_blocked:
-        #     # Both left and right are obstructed, direction random.
-        #     # print('Obstacle avoidance BACK')
-        #     leftSpeed = base_speed * CHANGEDIR_mat[1, 0]
-        #     rightSpeed = base_speed * CHANGEDIR_mat[1, 1]
-        #     STUCK_LR_counter += timestep
-        #     print('Left Right both obstructed, STUCK_LR_counter=%d'%(STUCK_LR_counter))
-        # elif left_blocked:
-        #     # Left side obstructed, turn right
-        #     # print('Obstacle avoidance turn right')
-        #     leftSpeed = base_speed * 1
-        #     rightSpeed = base_speed * -1
-        # elif right_blocked:
-        #     # right side obstructed, turn left
-        #     # print('Obstacle avoidance turn left')
-        #     leftSpeed = base_speed * -1
-        #     rightSpeed = base_speed * 1
+
 
         if blocked:
             leftSpeed = base_speed * CHANGEDIR_mat[0, 0]
@@ -225,10 +206,32 @@ while True:
     # Theta
     timediff = timeCounter - timeCounter2
     if timediff >= thetastep:
-        # print('Front=%d, Back=%d'% ( bumpers[0].getValue(), bumpers[1].getValue() ) )
+
+        # Get object ids
         objs = cam.getRecognitionObjects()
         idlist = [obj.getId() for obj in objs]
-        seq.step(idlist)
+
+        # Distance from robot to the object
+        id2list = []
+        for objid in idlist:
+
+            # Obtain object position
+            obj_node = robot.getFromId(objid)
+            objpos = obj_node.getPosition()
+
+            # Store object positions
+            if str(objid) not in fpos_dict:
+                fpos_key = '%d'%objid
+                fpos_dict[fpos_key] = objpos
+                print('Insert Id=%s with position ' % (fpos_key), objpos)
+
+            # Compute distance
+            dist = np.sqrt((new_pos[0] - objpos[0]) ** 2 + (new_pos[1] - objpos[1])**2)
+            dist_level = int(dist / dist_sep)  # discretized distance
+            id2list.append('%d_%d'%(objid, dist_level))
+
+        # print('step ', id2list)
+        seq.step(id2list)
 
         data["t"].append(timeCounter)
         data["x"].append(new_pos[0])
@@ -236,14 +239,11 @@ while True:
         data["z"].append(new_pos[2])
         data["a"].append(angle)
         data["objID"].append(idlist)
+        data["objID_dist"].append(id2list)
+        data['f_sigma'].append(seq.f_sigma.copy())
         data["X"].append(seq.X)
 
-        for key in seq.stored_f.keys():
-            if key not in pos_dict:
-                obj_node = robot.getFromId(key)
-                pos = obj_node.getPosition()
-                pos_dict[key] = pos
-                print('Insert Id=%d with position '%(key), pos)
+
 
         timeCounter2 = timeCounter
         pass
