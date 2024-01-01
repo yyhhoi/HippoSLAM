@@ -7,8 +7,9 @@ from os.path import join
 import os
 from hipposlam.sequences import Sequences
 from hipposlam.utils import save_pickle
-from controller import Robot, Display, Supervisor
+from controller import Supervisor
 import numpy as np
+
 
 # Project tags and paths
 save_tag = False
@@ -16,6 +17,8 @@ reobserve = False
 project_tag = 'avoidance_NoReObserve'
 save_dir = join('data', project_tag)
 os.makedirs(save_dir, exist_ok=True)
+img_dir = join(save_dir, 'imgs')
+os.makedirs(img_dir, exist_ok=True)
 
 # create the Robot instance.
 robot = Supervisor()
@@ -93,7 +96,8 @@ seq = Sequences(R=5, L=10, reobserve=reobserve)
 # Other parameters
 base_speed = 15
 timeCounter = 0
-timeCounter2 = 0
+timeCounter_theta = 0
+timeCounter_cam = 0
 global_count = 0
 navmodes = [True, False]  # [Obstacle avoidance, Stuck recuse]
 floor_diag = (7.7 **2 + 12.9 ** 2) ** (1/2)
@@ -204,7 +208,7 @@ while True:
         CHANGEDIR_count += np.random.randint(10, 100)
 
     # Theta
-    timediff = timeCounter - timeCounter2
+    timediff = timeCounter - timeCounter_theta
     if timediff >= thetastep:
 
         # Get object ids
@@ -245,9 +249,15 @@ while True:
 
 
 
-        timeCounter2 = timeCounter
+        timeCounter_theta = timeCounter
         pass
 
+    # Store image
+    if timeCounter - timeCounter_cam >= 1000:
+        imgpth = join(img_dir, '%dms.jpg' % (timeCounter))
+        img = cam.getImage()
+        cam.saveImage(imgpth, 100)
+        timeCounter_cam = timeCounter
 
     # Update wheels
     wheels[0].setVelocity(leftSpeed)
