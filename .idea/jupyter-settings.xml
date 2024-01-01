@@ -11,6 +11,15 @@
             </JupyterConnectionParameters>
           </value>
         </entry>
+        <entry key="$USER_HOME$/projects/directionalnet/.idea/directionalnet.iml">
+          <value>
+            <JupyterConnectionParameters>
+              <option name="managed" value="true" />
+              <option name="port" value="8888" />
+              <option name="sdkHomePath" value="C:\Users\yyhho\anaconda3\python.exe" />
+            </JupyterConnectionParameters>
+          </value>
+        </entry>
       </map>
     </option>
   </component>

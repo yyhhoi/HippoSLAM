@@ -11,7 +11,7 @@ from controller import Robot, Display, Supervisor
 import numpy as np
 
 # Project tags and paths
-save_tag = True
+save_tag = False
 reobserve = False
 project_tag = 'avoidance_NoReObserve'
 save_dir = join('data', project_tag)
