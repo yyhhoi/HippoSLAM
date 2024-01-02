@@ -8,6 +8,9 @@ import os
 from hipposlam.sequences import Sequences
 from hipposlam.utils import save_pickle
 from controller import Supervisor
+from hipposlam.vision import SiftMemory
+import cv2 as cv
+
 import numpy as np
 
 
@@ -35,10 +38,13 @@ print('Basic time step = %d ms, Theta time step = %d ms'%(timestep, thetastep))
 camera_timestep = 64
 cam = robot.getDevice('camera')
 cam.enable(camera_timestep)
-cam.recognitionEnable(camera_timestep)
+# cam.recognitionEnable(camera_timestep)
 # cam.enableRecognitionSegmentation()
 width = cam.getWidth()
 height = cam.getHeight()
+
+# Computer vision
+SM = SiftMemory(matchthresh=0.3)
 
 # Get Display
 display = robot.getDevice('display')
@@ -131,7 +137,7 @@ while True:
             save_pickle(save_pth, data)
             print('Traj data saved at ' + save_pth)
 
-            meta = dict(stored_f=seq.stored_f, fpos=fpos_dict, dist_level=dist_level)
+            meta = dict(stored_f=seq.stored_f, fpos=fpos_dict, dist_level=dist_sep)
             save_pth = join(save_dir, 'meta.pickle')
             save_pickle(save_pth, meta)
             print('Meta data saved at ' + save_pth)
@@ -211,41 +217,59 @@ while True:
     timediff = timeCounter - timeCounter_theta
     if timediff >= thetastep:
 
-        # Get object ids
-        objs = cam.getRecognitionObjects()
-        idlist = [obj.getId() for obj in objs]
 
-        # Distance from robot to the object
-        id2list = []
-        for objid in idlist:
+        imgobj = cam.getImage()
+        imgtmp = np.frombuffer(imgobj, np.uint8).reshape((cam.getHeight(), cam.getWidth(), 4))
+        gray = cv.cvtColor(imgtmp, cv.COLOR_BGRA2GRAY)
+        idnow, maxscore, noveltag = SM.observe(gray)
+        if idnow is -1:
+            idlist = []
+        else:
+            idlist = [idnow]
+        seq.step(idlist)
 
-            # Obtain object position
-            obj_node = robot.getFromId(objid)
-            objpos = obj_node.getPosition()
+        print('Time = %d ms'%(timeCounter))
+        print('Current scene: Match Score=%0.2f' % (maxscore), ', Novel: ', noveltag, ', ID=%d'%(idnow))
+        print('Num Obs: ', len(SM.obs_list))
+        print('Descriptor sizes:\n', ['%d'%(len(des)) for des in SM.obs_list])
 
-            # Store object positions
-            if str(objid) not in fpos_dict:
-                fpos_key = '%d'%objid
-                fpos_dict[fpos_key] = objpos
-                print('Insert Id=%s with position ' % (fpos_key), objpos)
 
-            # Compute distance
-            dist = np.sqrt((new_pos[0] - objpos[0]) ** 2 + (new_pos[1] - objpos[1])**2)
-            dist_level = int(dist / dist_sep)  # discretized distance
-            id2list.append('%d_%d'%(objid, dist_level))
 
-        # print('step ', id2list)
-        seq.step(id2list)
 
-        data["t"].append(timeCounter)
-        data["x"].append(new_pos[0])
-        data["y"].append(new_pos[1])
-        data["z"].append(new_pos[2])
-        data["a"].append(angle)
-        data["objID"].append(idlist)
-        data["objID_dist"].append(id2list)
-        data['f_sigma'].append(seq.f_sigma.copy())
-        data["X"].append(seq.X)
+        # # Get object ids
+        # objs = cam.getRecognitionObjects()
+        # idlist = [obj.getId() for obj in objs]
+        #
+        # # Distance from robot to the object
+        # id2list = []
+        # for objid in idlist:
+        #
+        #     # Obtain object position
+        #     obj_node = robot.getFromId(objid)
+        #     objpos = obj_node.getPosition()
+        #
+        #     # Store object positions
+        #     if str(objid) not in fpos_dict:
+        #         fpos_key = '%d'%objid
+        #         fpos_dict[fpos_key] = objpos
+        #         print('Insert Id=%s with position ' % (fpos_key), objpos)
+        #
+        #     # Compute distance
+        #     dist = np.sqrt((new_pos[0] - objpos[0]) ** 2 + (new_pos[1] - objpos[1])**2)
+        #     dist_level = int(dist / dist_sep)  # discretized distance
+        #     id2list.append('%d_%d'%(objid, dist_level))
+        #
+        # seq.step(id2list)
+        #
+        # data["t"].append(timeCounter)
+        # data["x"].append(new_pos[0])
+        # data["y"].append(new_pos[1])
+        # data["z"].append(new_pos[2])
+        # data["a"].append(angle)
+        # data["objID"].append(idlist)
+        # data["objID_dist"].append(id2list)
+        # data['f_sigma'].append(seq.f_sigma.copy())
+        # data["X"].append(seq.X)
 
 
 
