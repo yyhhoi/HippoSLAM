@@ -4,7 +4,7 @@ EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/project
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/floors/protos/Floor.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/appearances/protos/Parquetry.proto"
-EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/apartment_structure/protos/Wall.proto"
+EXTERNPROTO "../protos/Wall.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/appearances/protos/Roughcast.proto"
 EXTERNPROTO "../protos/Window.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/appearances/protos/MattePaint.proto"
@@ -20,7 +20,8 @@ EXTERNPROTO "../protos/Table.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/appearances/protos/VarnishedPine.proto"
 EXTERNPROTO "../protos/Monitor.proto"
 EXTERNPROTO "../protos/Keyboard.proto"
-EXTERNPROTO "../protos/OfficeChair.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/chairs/protos/WoodenChair.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/television/protos/Television.proto"
 
 WorldInfo {
   info [
@@ -32,8 +33,8 @@ WorldInfo {
   title "Break Room"
 }
 Viewpoint {
-  orientation -0.46224852368307506 0.4062616866891009 0.7882117382285957 1.929918684980188
-  position 1.4096761635688195 -8.169540180952088 18.136761562903207
+  orientation 0.538204734706026 0.5463940892510126 -0.6417080042913387 1.9867683746784257
+  position 1.2490223695206077 4.733637565076185 22.59534336088516
 }
 TexturedBackground {
   texture "entrance_hall"
@@ -56,7 +57,7 @@ Floor {
   }
 }
 Wall {
-  translation -2.65 0 0
+  translation -2.65 -0.36 0
   size 0.05 5 1.6
   appearance DEF SMALL_WALLS Roughcast {
     colorOverride 0.890196 0.803922 1
@@ -66,29 +67,15 @@ Wall {
   }
 }
 Wall {
-  translation 2.65 -0.77 0
+  translation 1.93 1.76 0
   name "wall(1)"
-  size 0.05 3.55 1.6
-  appearance USE SMALL_WALLS
-}
-Wall {
-  translation 0 -2.52 0
-  rotation 0 0 1 1.5708
-  name "wall(2)"
-  size 0.05 5.35 0.62
-  appearance USE SMALL_WALLS
-}
-Wall {
-  translation 3.026 0.979 0
-  rotation 0 0 1 1.5708
-  name "wall(7)"
-  size 0.05 0.7 0.62
+  size 0.05 6 1.6
   appearance USE SMALL_WALLS
 }
 Wall {
   translation -6.17 0.92 0
   name "wall(A)"
-  size 0.06 7.7 2.5
+  size 0.06 7.7 5
   appearance DEF SIDE_WALLS Roughcast {
     textureTransform TextureTransform {
       scale 3 3
@@ -99,7 +86,7 @@ Wall {
   translation -5.94 -2.9 0
   rotation 0 0 1 -1.5708003061004252
   name "wall(B)1"
-  size 0.06 0.4 2.5
+  size 0.06 0.4 5
   appearance DEF INTER_WALLS Roughcast {
     textureTransform TextureTransform {
       scale 0.3 2.2
@@ -110,7 +97,7 @@ Window {
   translation -5.19 -2.9 0
   rotation 0 0 1 -1.5708003061004252
   name "window(B)2"
-  size 0.06 1.1 2.5
+  size 0.06 1.1 5
   bottomWallHeight 1
   frameSize 0.02 0.05 0.02
   windowSillSize 0.3 0.05
@@ -122,7 +109,7 @@ Window {
   translation -3.84 -2.9 0
   rotation 0 0 1 -1.5708003061004252
   name "window(B)3"
-  size 0.06 1.6 2.5
+  size 0.06 1.6 5
   bottomWallHeight 1
   frameSize 0.02 0.05 0.02
   windowSillSize 0.3 0.05
@@ -132,14 +119,14 @@ Wall {
   translation -2.84 -2.9 0
   rotation 0 0 1 -1.5708003061004252
   name "wall(B)4"
-  size 0.06 0.4 2.5
+  size 0.06 0.4 5
   appearance USE INTER_WALLS
 }
 Window {
   translation -2.09 -2.9 0
   rotation 0 0 1 -1.5708003061004252
   name "window(B)5"
-  size 0.06 1.1 2.5
+  size 0.06 1.1 5
   bottomWallHeight 1
   frameSize 0.02 0.05 0.02
   windowSillSize 0.3 0.05
@@ -149,7 +136,7 @@ Window {
   translation -0.74 -2.9 0
   rotation 0 0 1 -1.5708003061004252
   name "window(B)6"
-  size 0.06 1.6 2.5
+  size 0.06 1.6 5
   bottomWallHeight 1
   frameSize 0.02 0.05 0.02
   windowSillSize 0.3 0.05
@@ -159,14 +146,14 @@ Wall {
   translation 0.26 -2.9 0
   rotation 0 0 1 -1.5708003061004252
   name "wall(B)7"
-  size 0.06 0.4 2.5
+  size 0.06 0.4 5
   appearance USE INTER_WALLS
 }
 Window {
   translation 1 -2.9 0
   rotation 0 0 1 -1.5708003061004252
   name "window(B)8"
-  size 0.06 1.1 2.5
+  size 0.06 1.1 5
   bottomWallHeight 1
   frameSize 0.02 0.05 0.02
   windowSillSize 0.3 0.05
@@ -176,7 +163,7 @@ Window {
   translation 2.35 -2.9 0
   rotation 0 0 1 -1.5708003061004252
   name "window(B)9"
-  size 0.06 1.6 2.5
+  size 0.06 1.6 5
   bottomWallHeight 1
   frameSize 0.02 0.05 0.02
   windowSillSize 0.3 0.05
@@ -186,14 +173,14 @@ Wall {
   translation 3.35 -2.9 0
   rotation 0 0 1 -1.5708003061004252
   name "wall(B)10"
-  size 0.06 0.4 2.5
+  size 0.06 0.4 5
   appearance USE INTER_WALLS
 }
 Window {
   translation 4.1 -2.9 0
   rotation 0 0 1 -1.5708003061004252
   name "window(B)11"
-  size 0.06 1.1 2.5
+  size 0.06 1.1 5
   bottomWallHeight 1
   frameSize 0.02 0.05 0.02
   windowSillSize 0.3 0.05
@@ -203,7 +190,7 @@ Window {
   translation 5.45 -2.9 0
   rotation 0 0 1 -1.5708003061004252
   name "window(B)12"
-  size 0.06 1.6 2.5
+  size 0.06 1.6 5
   bottomWallHeight 1
   frameSize 0.02 0.05 0.02
   windowSillSize 0.3 0.05
@@ -213,25 +200,25 @@ Wall {
   translation 6.45 -2.9 0
   rotation 0 0 1 -1.5708003061004252
   name "wall(B)13"
-  size 0.06 0.4 2.5
+  size 0.06 0.4 5
   appearance USE INTER_WALLS
 }
 Wall {
   translation 6.68 0.92 0
   name "wall(C)"
-  size 0.06 7.7 2.5
+  size 0.06 7.7 5
   appearance USE SIDE_WALLS
 }
 Wall {
   translation 3.6 4.8 0
   rotation 0 0 1 -1.5708003061004252
   name "wall(D)1"
-  size 0.06 6.2 2.5
+  size 0.06 6.2 5
 }
 Door {
   translation 0 4.8 0
   rotation 0 0 -1 1.5708
-  size 0.06 1 2.5
+  size 0.06 1 5
   frameSize 0.01 0.05 0.05
   frameAppearance MattePaint {
     baseColor 0.133333 0.0666667 0
@@ -241,41 +228,45 @@ Wall {
   translation -3.35 4.8 0
   rotation 0 0 1 -1.5708003061004252
   name "wall(D)2"
-  size 0.06 5.7 2.5
+  size 0.06 5.7 5
 }
 Sofa {
-  translation -2.06001 -0.439982 0
+  translation -2.09001 0.250018 0
   rotation 0 0 1 -5.307179586466759e-06
 }
 PottedTree {
-  translation 2.38 -2.15 0
+  translation 3.37 -2.65 0
 }
 PottedTree {
-  translation 6.31 1.68 0
+  translation 2.26 0.49 0
   name "potted tree(3)"
 }
 PottedTree {
-  translation 0.58 1.61 0
+  translation 1.61 4.44 0
   name "potted tree(1)"
 }
 PottedTree {
-  translation 0.16 1.74 0
+  translation -2.28 2.17 0
   name "potted tree(6)"
 }
 PottedTree {
-  translation 0.33 1.32 0
+  translation 1.64 1.18 0
   name "potted tree(5)"
 }
+Television {
+  translation 1.81 0.3 0.84
+  controller "<none>"
+}
 PottedTree {
-  translation 5.2 4.47 0
+  translation 6.35 4.45 0
   name "potted tree(4)"
 }
 PottedTree {
-  translation -5.78 -2.17 0
+  translation -5.78 -2.46 0
   name "potted tree(2)"
 }
 Cabinet {
-  translation -2.60997 1.54 0
+  translation -2.60997 1.49 0
   rotation 0 0 -1 8.98519e-06
   outerThickness 0.02
   rowsHeights [
@@ -302,7 +293,7 @@ Cabinet {
   }
 }
 Cabinet {
-  translation 2.62 0.22 0
+  translation 1.92 0.32 0
   rotation 0 0 1 3.14159
   name "cabinet(1)"
   outerThickness 0.02
@@ -386,7 +377,7 @@ Cabinet {
     baseColor 0.729412 0.741176 0.713725
   }
   secondaryAppearance MattePaint {
-    baseColor 0.666667 0.333333 0
+    baseColor 0.635294 0.666667 0.00784314
   }
 }
 Cabinet {
@@ -902,7 +893,7 @@ Sink {
   rotation 0 0 -1 -1.5708
 }
 Table {
-  translation 3.18 -1.66 0
+  translation 2.48 2.18 0
   size 1 1.6 0.74
   feetSize 0.05 0.05
   trayAppearance DEF TABLE_WOOD VarnishedPine {
@@ -915,7 +906,7 @@ Table {
   }
 }
 Table {
-  translation 6.14 -1.41 0
+  translation 6.14 -1.72 0
   name "table(1)"
   size 1 1.6 0.74
   feetSize 0.05 0.05
@@ -933,7 +924,7 @@ Table {
   }
 }
 Table {
-  translation 3.18 0.05 0
+  translation 2.49 3.87 0
   name "table(3)"
   feetSize 0.05 0.05
   legAppearance MattePaint {
@@ -949,7 +940,7 @@ Table {
   }
 }
 Table {
-  translation -5.46 3.27 0
+  translation -5.46 3.61 0
   rotation 0 0 1 1.5707996938995747
   name "table(8)"
   size 1 1 0.74
@@ -988,27 +979,27 @@ Monitor {
   name "monitor(5)"
 }
 Monitor {
-  translation -5.48112 3.20074 0.76
+  translation -5.41708 3.68648 0.76
   rotation 0 0 1 1.4399
   name "monitor(7)"
 }
 Monitor {
-  translation 2.87928 -1.79048 0.76
+  translation 2.41105 2.07138 0.76
   rotation 0 0 1 0.1308996938995747
   name "monitor(8)"
 }
 Monitor {
-  translation 2.87723 -1.29031 0.76
+  translation 2.41769 2.5727 0.76
   rotation 0 0 1 -0.1308996938995747
   name "monitor(9)"
 }
 Monitor {
-  translation 2.87723 -0.18031 0.76
+  translation 2.31097 3.50732 0.76
   rotation 0 0 1 0.1308996938995747
   name "monitor(10)"
 }
 Monitor {
-  translation 2.87723 0.35969 0.76
+  translation 2.30032 4.09688 0.76
   rotation 0 0 1 -0.1308996938995747
   name "monitor(11)"
 }
@@ -1026,55 +1017,48 @@ Keyboard {
   name "keyboard(2)"
 }
 Keyboard {
-  translation -5.48 3.62 0.74
+  translation -5.48 3.94 0.74
   rotation 0 0 1 1.5708
   name "keyboard(3)"
 }
 Keyboard {
-  translation 2.98306 -1.5267 0.74
+  translation 2.61644 2.2055 0.74
   rotation 0 0 1 -0.2617916122008506
   name "keyboard(4)"
 }
 Keyboard {
-  translation 3.07 0.1 0.74
+  translation 2.5 3.79 0.74
   name "keyboard(5)"
 }
-OfficeChair {
-  translation 3.63252 0.373834 0
-  rotation 0 0 1 -3.1415853071795863
-  enablePhysics FALSE
+WoodenChair {
+  translation -3.66 -1.63 0
 }
-OfficeChair {
-  translation 3.68 -1.38 0
-  rotation 0 0 1 3.14159
-  name "office chair(1)"
-  enablePhysics FALSE
+WoodenChair {
+  translation -3.6 -0.09 0
+  name "wooden chair(4)"
 }
-OfficeChair {
-  translation 5.58606 -1.42382 0
-  rotation 0 0 1 -0.2618053071795865
-  name "office chair(2)"
-  enablePhysics FALSE
-}
-OfficeChair {
-  translation -3.71844 -1.72104 0
-  rotation 0 0 1 -5.307179586466759e-06
-  name "office chair(3)"
-  enablePhysics FALSE
-}
-OfficeChair {
-  translation -3.63 0.0700003 0
-  name "office chair(4)"
-  enablePhysics FALSE
-}
-OfficeChair {
-  translation -5.44962 3.97273 0
+WoodenChair {
+  translation -5.5 4.45 0
   rotation 0 0 1 -1.5707953071795862
-  name "office chair(5)"
-  enablePhysics FALSE
+  name "wooden chair(5)"
+}
+WoodenChair {
+  translation 5.76 -1.63 0
+  name "wooden chair(3)"
+}
+WoodenChair {
+  translation 2.83 2.3 0
+  rotation 0 0 1 3.14159
+  name "wooden chair(1)"
+}
+WoodenChair {
+  translation 2.85 3.99 0
+  rotation 0 0 1 3.14159
+  name "wooden chair(2)"
 }
 DEF AGENT Robot {
-  translation -3.98998 3.31006 0.07
+  translation 4.32002 3.31006 0.07
+  rotation 0 0 1 -1.5707953071795862
   children [
     TouchSensor {
       translation 0.01 0 0.75
@@ -1530,4 +1514,110 @@ DEF AGENT Robot {
   }
   controller "<extern>"
   supervisor TRUE
+}
+Solid {
+  translation 3.11 3 0.47
+  children [
+    Shape {
+      appearance DEF TRANSPARENT PBRAppearance {
+        transparency 1
+        roughness 1
+        metalness 0
+      }
+      geometry Box {
+        size 0.02 3.4 0.9
+      }
+    }
+  ]
+  name "invisible_wall"
+}
+Solid {
+  translation -3.94 -0.89 0.47
+  children [
+    Shape {
+      appearance USE TRANSPARENT
+      geometry Box {
+        size 0.02 3.9 0.9
+      }
+    }
+  ]
+  name "invisible_wall(4)"
+}
+Solid {
+  translation 2.54 1.29 0.47
+  rotation 0 0 1 -1.5707953071795862
+  children [
+    Shape {
+      appearance USE TRANSPARENT
+      geometry Box {
+        size 0.02 1.15 0.9
+      }
+    }
+  ]
+  name "invisible_wall(1)"
+}
+Solid {
+  translation -3.3 1.06 0.47
+  rotation 0 0 1 -1.5707953071795862
+  children [
+    Shape {
+      appearance USE TRANSPARENT
+      geometry Box {
+        size 0.02 1.29 0.9
+      }
+    }
+  ]
+  name "invisible_wall(5)"
+}
+Solid {
+  translation -5.53 3.08 0.47
+  rotation 0 0 1 -1.5707953071795862
+  children [
+    Shape {
+      appearance USE TRANSPARENT
+      geometry Box {
+        size 0.02 1.23 0.9
+      }
+    }
+  ]
+  name "invisible_wall(7)"
+}
+Solid {
+  translation -4.92 3.93 0.47
+  rotation 0 0 1 3.14159
+  children [
+    Shape {
+      appearance USE TRANSPARENT
+      geometry Box {
+        size 0.02 1.68 0.9
+      }
+    }
+  ]
+  name "invisible_wall(6)"
+}
+Solid {
+  translation 6.07 -0.82 0.47
+  rotation 0 0 1 -1.5707953071795862
+  children [
+    Shape {
+      appearance USE TRANSPARENT
+      geometry Box {
+        size 0.02 1.15 0.9
+      }
+    }
+  ]
+  name "invisible_wall(2)"
+}
+Solid {
+  translation 5.49 -1.83 0.47
+  rotation 0 0 1 3.14159
+  children [
+    Shape {
+      appearance USE TRANSPARENT
+      geometry Box {
+        size 0.02 2.05 0.9
+      }
+    }
+  ]
+  name "invisible_wall(3)"
 }
