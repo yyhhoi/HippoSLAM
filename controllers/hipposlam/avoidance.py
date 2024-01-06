@@ -15,9 +15,9 @@ import numpy as np
 
 
 # Project tags and paths
-save_tag = False
+save_tag = True
 reobserve = False
-project_tag = 'avoidance_NoReObserve'
+project_tag = 'Avoidance_Sift'
 save_dir = join('data', project_tag)
 os.makedirs(save_dir, exist_ok=True)
 img_dir = join(save_dir, 'imgs')
@@ -35,7 +35,7 @@ thetastep = 128
 print('Basic time step = %d ms, Theta time step = %d ms'%(timestep, thetastep))
 
 # Get Camera
-camera_timestep = 64
+camera_timestep = thetastep
 cam = robot.getDevice('camera')
 cam.enable(camera_timestep)
 # cam.recognitionEnable(camera_timestep)
@@ -43,8 +43,11 @@ cam.enable(camera_timestep)
 width = cam.getWidth()
 height = cam.getHeight()
 
-# Computer vision
-SM = SiftMemory(matchthresh=0.3)
+# Sift scene recognition
+newMemoryThresh = 0.1
+memoryActivationThresh = 0.2
+SM = SiftMemory(newMemoryThresh=newMemoryThresh,
+                memoryActivationThresh=memoryActivationThresh)
 
 # Get Display
 display = robot.getDevice('display')
@@ -118,7 +121,7 @@ data = dict(
     z = [],
     a = [],
     objID = [],
-    objID_dist= [],
+    # objID_dist= [],
     f_sigma=[],
     X = [],
 
@@ -221,17 +224,14 @@ while True:
         imgobj = cam.getImage()
         imgtmp = np.frombuffer(imgobj, np.uint8).reshape((cam.getHeight(), cam.getWidth(), 4))
         gray = cv.cvtColor(imgtmp, cv.COLOR_BGRA2GRAY)
-        idnow, maxscore, noveltag = SM.observe(gray)
-        if idnow is -1:
-            idlist = []
-        else:
-            idlist = [idnow]
+        idlist, maxscore, noveltag = SM.observe(gray)
         seq.step(idlist)
 
-        print('Time = %d ms'%(timeCounter))
-        print('Current scene: Match Score=%0.2f' % (maxscore), ', Novel: ', noveltag, ', ID=%d'%(idnow))
+        print('Time = %d ms, Thresh=%0.2f' % (timeCounter, SM.newMemoryThresh))
         print('Num Obs: ', len(SM.obs_list))
-        print('Descriptor sizes:\n', ['%d'%(len(des)) for des in SM.obs_list])
+        print('Activated ID: ', idlist)
+        print('Match score: ', maxscore)
+        print('Descriptor sizes:\n', [len(des) for des in SM.obs_list])
 
 
 
@@ -261,27 +261,27 @@ while True:
         #
         # seq.step(id2list)
         #
-        # data["t"].append(timeCounter)
-        # data["x"].append(new_pos[0])
-        # data["y"].append(new_pos[1])
-        # data["z"].append(new_pos[2])
-        # data["a"].append(angle)
-        # data["objID"].append(idlist)
+        data["t"].append(timeCounter)
+        data["x"].append(new_pos[0])
+        data["y"].append(new_pos[1])
+        data["z"].append(new_pos[2])
+        data["a"].append(angle)
+        data["objID"].append(idlist)
         # data["objID_dist"].append(id2list)
-        # data['f_sigma'].append(seq.f_sigma.copy())
-        # data["X"].append(seq.X)
+        data['f_sigma'].append(seq.f_sigma.copy())
+        data["X"].append(seq.X)
 
 
 
         timeCounter_theta = timeCounter
         pass
 
-    # Store image
-    if timeCounter - timeCounter_cam >= 1000:
-        imgpth = join(img_dir, '%dms.jpg' % (timeCounter))
-        img = cam.getImage()
-        cam.saveImage(imgpth, 100)
-        timeCounter_cam = timeCounter
+    # # Store image
+    # if timeCounter - timeCounter_cam >= 1000:
+    #     imgpth = join(img_dir, '%dms.jpg' % (timeCounter))
+    #     img = cam.getImage()
+    #     cam.saveImage(imgpth, 100)
+    #     timeCounter_cam = timeCounter
 
     # Update wheels
     wheels[0].setVelocity(leftSpeed)
