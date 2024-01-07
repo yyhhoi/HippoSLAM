@@ -33,8 +33,8 @@ WorldInfo {
   title "Break Room"
 }
 Viewpoint {
-  orientation 0.538204734706026 0.5463940892510126 -0.6417080042913387 1.9867683746784257
-  position 1.2490223695206077 4.733637565076185 22.59534336088516
+  orientation 0.5590316341468776 0.5562997041087979 -0.6148286519279462 2.04345095618221
+  position -1.1097182588475474 2.6405726313489333 25.92320554606194
 }
 TexturedBackground {
   texture "entrance_hall"
@@ -262,7 +262,7 @@ PottedTree {
   name "potted tree(4)"
 }
 PottedTree {
-  translation -5.78 -2.46 0
+  translation -5.78 -2.62 0
   name "potted tree(2)"
 }
 Cabinet {
@@ -1096,8 +1096,8 @@ DEF AGENT Robot {
         }
       ]
       endPoint DEF WHEEL4 Solid {
-        translation -0.1 -0.11 -0.02
-        rotation 1 -3.9252239376397585e-17 3.9252239376397585e-17 1.5707999999999998
+        translation -0.09999999999999964 -0.10999999999999943 -0.019999999999999997
+        rotation 1 1.355143461503873e-32 7.850447875279513e-17 1.5707999999999998
         children [
           DEF WHEEL Shape {
             appearance PBRAppearance {
@@ -1129,8 +1129,8 @@ DEF AGENT Robot {
         }
       ]
       endPoint DEF WHEEL3 Solid {
-        translation -0.1 0.11 -0.02
-        rotation 1 0 0 1.5707999999999995
+        translation -0.10000000000000009 0.11000000000000032 -0.019999999999999997
+        rotation 1 -1.5700895750559036e-16 -2.7102996419277975e-32 1.5707999999999995
         children [
           DEF WHEEL Shape {
             appearance PBRAppearance {
@@ -1162,8 +1162,8 @@ DEF AGENT Robot {
         }
       ]
       endPoint DEF WHEEL2 Solid {
-        translation 0.1 -0.11 -0.02
-        rotation 1 1.5700895750559036e-16 3.925223937639759e-17 1.5707999999999998
+        translation 0.10000000000000009 -0.10999999999999943 -0.019999999999999997
+        rotation 1 1.5700895750559034e-16 7.850447875279513e-17 1.5707999999999998
         children [
           DEF WHEEL Shape {
             appearance PBRAppearance {
@@ -1195,8 +1195,8 @@ DEF AGENT Robot {
         }
       ]
       endPoint DEF WHEEL1 Solid {
-        translation 0.1 0.11 -0.02
-        rotation 1 0 -7.850447875279518e-17 1.5707999999999998
+        translation 0.09999999999999964 0.11000000000000032 -0.019999999999999997
+        rotation 1 1.3551434615038731e-32 -2.355134362583855e-16 1.5707999999999998
         children [
           DEF WHEEL Shape {
             appearance PBRAppearance {
@@ -1267,7 +1267,7 @@ DEF AGENT Robot {
       ]
     }
     DistanceSensor {
-      translation 0.145 0.05 0
+      translation 0.145 0.05 0.03
       rotation 0 0 1 0.523599
       children [
         DEF DS_SHAPE Shape {
@@ -1457,7 +1457,7 @@ DEF AGENT Robot {
           }
         }
       ]
-      name "ds11"
+      name "ds10"
       boundingObject USE DS_SHAPE
       lookupTable [
         0 0 0
@@ -1477,7 +1477,7 @@ DEF AGENT Robot {
           }
         }
       ]
-      name "ds10"
+      name "ds11"
       boundingObject USE DS_SHAPE
       lookupTable [
         0 0 0
@@ -1518,7 +1518,7 @@ DEF AGENT Robot {
 Solid {
   translation 3.11 3 0.47
   children [
-    Shape {
+    DEF INVISIBLE_WALL Shape {
       appearance DEF TRANSPARENT PBRAppearance {
         transparency 1
         roughness 1
@@ -1530,11 +1530,12 @@ Solid {
     }
   ]
   name "invisible_wall"
+  boundingObject USE INVISIBLE_WALL
 }
 Solid {
   translation -3.94 -0.89 0.47
   children [
-    Shape {
+    DEF INVISIBLE_ALL4 Shape {
       appearance USE TRANSPARENT
       geometry Box {
         size 0.02 3.9 0.9
@@ -1542,12 +1543,13 @@ Solid {
     }
   ]
   name "invisible_wall(4)"
+  boundingObject USE INVISIBLE_ALL4
 }
 Solid {
   translation 2.54 1.29 0.47
   rotation 0 0 1 -1.5707953071795862
   children [
-    Shape {
+    DEF INVISIBLE_WALL1 Shape {
       appearance USE TRANSPARENT
       geometry Box {
         size 0.02 1.15 0.9
@@ -1555,12 +1557,13 @@ Solid {
     }
   ]
   name "invisible_wall(1)"
+  boundingObject USE INVISIBLE_WALL1
 }
 Solid {
   translation -3.3 1.06 0.47
   rotation 0 0 1 -1.5707953071795862
   children [
-    Shape {
+    DEF INVISIBLE_WALL5 Shape {
       appearance USE TRANSPARENT
       geometry Box {
         size 0.02 1.29 0.9
@@ -1568,12 +1571,13 @@ Solid {
     }
   ]
   name "invisible_wall(5)"
+  boundingObject USE INVISIBLE_WALL5
 }
 Solid {
   translation -5.53 3.08 0.47
   rotation 0 0 1 -1.5707953071795862
   children [
-    Shape {
+    DEF INVISIBLE_WALL7 Shape {
       appearance USE TRANSPARENT
       geometry Box {
         size 0.02 1.23 0.9
@@ -1581,12 +1585,13 @@ Solid {
     }
   ]
   name "invisible_wall(7)"
+  boundingObject USE INVISIBLE_WALL7
 }
 Solid {
   translation -4.92 3.93 0.47
   rotation 0 0 1 3.14159
   children [
-    Shape {
+    DEF INVISIBLE_WALL6 Shape {
       appearance USE TRANSPARENT
       geometry Box {
         size 0.02 1.68 0.9
@@ -1594,12 +1599,13 @@ Solid {
     }
   ]
   name "invisible_wall(6)"
+  boundingObject USE INVISIBLE_WALL6
 }
 Solid {
   translation 6.07 -0.82 0.47
   rotation 0 0 1 -1.5707953071795862
   children [
-    Shape {
+    DEF INVISIBLE_WALL2 Shape {
       appearance USE TRANSPARENT
       geometry Box {
         size 0.02 1.15 0.9
@@ -1607,12 +1613,13 @@ Solid {
     }
   ]
   name "invisible_wall(2)"
+  boundingObject USE INVISIBLE_WALL2
 }
 Solid {
   translation 5.49 -1.83 0.47
   rotation 0 0 1 3.14159
   children [
-    Shape {
+    DEF INVISIBLE_WALL3 Shape {
       appearance USE TRANSPARENT
       geometry Box {
         size 0.02 2.05 0.9
@@ -1620,4 +1627,5 @@ Solid {
     }
   ]
   name "invisible_wall(3)"
+  boundingObject USE INVISIBLE_WALL3
 }

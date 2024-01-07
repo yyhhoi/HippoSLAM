@@ -9,6 +9,7 @@ from hipposlam.sequences import Sequences
 from hipposlam.utils import save_pickle
 from controller import Supervisor
 from hipposlam.vision import SiftMemory
+from hipposlam.kinematics import compute_steering, convert_steering_to_wheelspeed
 import cv2 as cv
 
 import numpy as np
@@ -61,13 +62,35 @@ for i in range(4):
     wheels[i].setPosition(float('inf'))
     wheels[i].setVelocity(0)
 
-# Get distance sensors
-ds = []
-for i in range(1, 13):
-    ds_each = robot.getDevice('ds%d'%i)
 
-    ds.append(ds_each)
-    ds[i-1].enable(timestep)
+# Get distance sensors and their orientations
+ds = []
+ds_names = []
+ds_angles = []
+ds_maxs = []
+robot_children_field = agent_node.getField('children')
+num_fields = robot_children_field   .getCount()
+print('There are %d fields in Robot'%(num_fields))
+for i in range(num_fields):
+    node = robot_children_field.getMFNode(i)
+    nodetypename = node.getTypeName()
+    print('%d Node type = %s'%(i, nodetypename))
+
+    if (i >= 8) and (i <= 20):
+        ds_rotation_field = node.getField('rotation')
+        name_field = node.getField('name')
+        dsangle = ds_rotation_field.getSFRotation()[3]
+        dsname = node.getField('name').getSFString()
+        print('Name = %s, angle = %0.4f'%(dsname, dsangle))
+        ds_names.append(dsname)
+        ds_angles.append(dsangle)
+        ds_each = robot.getDevice(dsname)
+        ds_each.enable(timestep)
+        ds.append(ds_each)
+        ds_maxs.append(ds_each.getMaxValue())
+ds_angles = np.array(ds_angles)
+ds_maxs = np.array(ds_maxs)
+
 
 # Get touch sensor
 bumpers = []
@@ -83,17 +106,17 @@ OA_dsThresh = 95
 
 # Stuck-detection (STUCK) and recuse
 pos = np.array(translation_field.getSFVec3f())
-STUCK_thresh = 2000  # in ms
+STUCK_thresh = 3000  # in ms
 STUCK_epsilon = 1e-3
 STUCK_counttime = 0
-STUCK_recuseMaxT = 2000  # in ms
+STUCK_recuseMaxT = 1000  # in ms
 STUCK_recusettime = STUCK_recuseMaxT
 STUCK_LR_counter = 0
 STUCK_LR_thresh = 1000
 
 # Change-direction (CHANGEDIR)
 CHANGEDIR_count = 0
-CHANGEDIR_thresh = 5e3  # every 5s
+CHANGEDIR_thresh = 10e3  # every ?s
 CHANGEDIR_mat = np.array([
     [1, -1],  # Avoidance speed coefficients
     [-0.3, -0.6]  # STUCK recuse speed coefficients
@@ -128,7 +151,7 @@ data = dict(
 )
 
 fpos_dict = dict()
-
+ds_epsilon = 0.05
 while True:
     sim_state = robot.step(timestep)
 
@@ -158,33 +181,27 @@ while True:
 
     # Obstacle avoidance
     if navmodes[0]:
-        blocked = np.any(ds_vals[[0, 1, 2, 3, 11]] < OA_dsThresh)
-
-
-        if blocked:
-            leftSpeed = base_speed * CHANGEDIR_mat[0, 0]
-            rightSpeed = base_speed * CHANGEDIR_mat[0, 1]
-
-        else:  # Unobstructed
-            # print('Obstacle avoidance forward')
-            leftSpeed = base_speed
-            rightSpeed = base_speed
+        steering_a = compute_steering(ds_vals, ds_maxs, ds_angles, epsilon=0.1)
+        leftSpeed, rightSpeed = convert_steering_to_wheelspeed(steering_a, base_speed)
+        # print('Steering %0.2f '%(np.rad2deg(steering_a)))
+        # print('leftSpeed=%0.2f, rightSpeed=%0.2f'%(leftSpeed, rightSpeed))
 
 
         # Stuck detection
         dpos = new_pos - pos
         dpos_val = np.mean(np.abs(dpos))
-        # print('Dpos = %0.6f, Count = %0.4f'% (dpos_val, STUCK_counttime))
         if dpos_val < STUCK_epsilon:
             STUCK_counttime += timestep
-
-        if (STUCK_counttime > STUCK_thresh) or (STUCK_LR_counter > STUCK_LR_thresh) or (bumpers[0].getValue() >0):
+        # print('STUCK_counttime: ', STUCK_counttime)
+        if (STUCK_counttime > STUCK_thresh) or (bumpers[0].getValue() >0):
             navmodes = [False, True]
+        # if  (STUCK_LR_counter > STUCK_LR_thresh) or (bumpers[0].getValue() >0):
+        #     navmodes = [False, True]
 
     
     # Stuck recuse
     if navmodes[1]:
-        print('Stuck recuse')
+        print('Stuck recuse: %d'%(STUCK_recusettime))
         if (STUCK_recusettime > 0) and (bumpers[1].getValue() < 1):
             # Start recusing from STUCK if there was not recuse attempted before
             leftSpeed = base_speed * CHANGEDIR_mat[1, 0]
@@ -201,6 +218,7 @@ while True:
 
     # CHANGEDIR behaviour
     if CHANGEDIR_count > CHANGEDIR_thresh:
+        print('Change mat')
         np.random.seed(global_count)
         negval = np.random.uniform(-1, 0)
         np.random.seed(global_count + 1)
@@ -209,8 +227,9 @@ while True:
         np.random.seed(global_count + 2)
         avoidance_vals = avoidance_vals[np.random.permutation(2)]
         np.random.seed(global_count + 3)
-        stuck_negvals = np.random.uniform(-1, -0.1, size=2)
-        CHANGEDIR_mat = np.vstack([avoidance_vals, stuck_negvals])
+        stuck_ranvec = np.random.permutation(2)
+        stuck_vals = np.array([1, -1])[stuck_ranvec]
+        CHANGEDIR_mat = np.vstack([avoidance_vals, stuck_vals])
         CHANGEDIR_count = 0
     else:
         np.random.seed(global_count)
@@ -218,15 +237,16 @@ while True:
 
     # Theta
     timediff = timeCounter - timeCounter_theta
-    if timediff >= thetastep:
-
+    time = int(robot.getTime() * 1e3)
+    if (time % thetastep) == 0:
 
         imgobj = cam.getImage()
         imgtmp = np.frombuffer(imgobj, np.uint8).reshape((cam.getHeight(), cam.getWidth(), 4))
         gray = cv.cvtColor(imgtmp, cv.COLOR_BGRA2GRAY)
+        np.save(join(img_dir, '%d.npy'%(time)), gray)
+
         idlist, maxscore, noveltag = SM.observe(gray)
         seq.step(idlist)
-
         print('Time = %d ms, Thresh=%0.2f' % (timeCounter, SM.newMemoryThresh))
         print('Num Obs: ', len(SM.obs_list))
         print('Activated ID: ', idlist)
@@ -235,7 +255,7 @@ while True:
 
 
 
-
+        # # =========================== Object recognition ===========================
         # # Get object ids
         # objs = cam.getRecognitionObjects()
         # idlist = [obj.getId() for obj in objs]
@@ -260,8 +280,9 @@ while True:
         #     id2list.append('%d_%d'%(objid, dist_level))
         #
         # seq.step(id2list)
-        #
-        data["t"].append(timeCounter)
+        # # ========================================================================================
+
+        data["t"].append(time)
         data["x"].append(new_pos[0])
         data["y"].append(new_pos[1])
         data["z"].append(new_pos[2])
@@ -270,9 +291,6 @@ while True:
         # data["objID_dist"].append(id2list)
         data['f_sigma'].append(seq.f_sigma.copy())
         data["X"].append(seq.X)
-
-
-
         timeCounter_theta = timeCounter
         pass
 
