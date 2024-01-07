@@ -9,14 +9,15 @@ from hipposlam.sequences import Sequences
 from hipposlam.utils import save_pickle
 from controller import Supervisor
 from hipposlam.vision import SiftMemory
-from hipposlam.kinematics import compute_steering, convert_steering_to_wheelspeed
+from hipposlam.kinematics import compute_steering, convert_steering_to_wheelspeed, convert_steering_to_wheelacceleration_nonlinear
+
 import cv2 as cv
 
 import numpy as np
 
 
 # Project tags and paths
-save_tag = True
+save_tag = False
 reobserve = False
 project_tag = 'Avoidance_Sift'
 save_dir = join('data', project_tag)
@@ -151,8 +152,13 @@ data = dict(
 )
 
 fpos_dict = dict()
-ds_epsilon = 0.05
+vl = 10
+vr = 10
+dt = timestep * 1e-3
+acce_k = 40
+ds_epsilon = 0.1
 while True:
+    print()
     sim_state = robot.step(timestep)
 
     if sim_state == -1:
@@ -181,10 +187,32 @@ while True:
 
     # Obstacle avoidance
     if navmodes[0]:
-        steering_a = compute_steering(ds_vals, ds_maxs, ds_angles, epsilon=0.1)
-        leftSpeed, rightSpeed = convert_steering_to_wheelspeed(steering_a, base_speed)
-        # print('Steering %0.2f '%(np.rad2deg(steering_a)))
-        # print('leftSpeed=%0.2f, rightSpeed=%0.2f'%(leftSpeed, rightSpeed))
+        steering_a, ds_amp = compute_steering(ds_vals, ds_maxs, ds_angles, epsilon=ds_epsilon)
+        ds_mask = ds_amp > ds_epsilon
+        if np.any(ds_mask):
+            ds_amp_mean = np.mean(ds_amp[ds_amp > ds_epsilon])
+            acce_amp = acce_k * ( ds_amp_mean / 100 )
+        else:
+            ds_amp_mean = 0
+            acce_amp = 0
+
+        # leftSpeed, rightSpeed = convert_steering_to_wheelspeed(steering_a, base_speed)
+        left_acce, right_acce = convert_steering_to_wheelacceleration_nonlinear(steering_a, acce_amp)
+        vl_nat = (10-vl)
+        vr_nat = (10-vr)
+        dvl = vl_nat + left_acce
+        dvr = vr_nat + right_acce
+        vl += dvl * dt
+        vr += dvr * dt
+        vl = np.clip(vl, a_min=-15, a_max=15)
+        vr = np.clip(vr, a_min=-15, a_max=15)
+        leftSpeed, rightSpeed = vl, vr
+
+        print('Steering %0.2f, ds_amp_mean=%0.4f, acce_amp=%0.2f'%(np.rad2deg(steering_a), ds_amp_mean, acce_amp))
+        print('vl_nat=%0.4f, vr_nat=%0.4f'%(vl_nat, vr_nat))
+        print('left_acce=%0.4f, right_acce=%0.4f'%(left_acce, right_acce))
+        print('dvl=%0.4f, dvr=%0.4f'%(dvl, dvr))
+        print('leftSpeed=%0.2f, rightSpeed=%0.2f'%(leftSpeed, rightSpeed))
 
 
         # Stuck detection
@@ -192,7 +220,8 @@ while True:
         dpos_val = np.mean(np.abs(dpos))
         if dpos_val < STUCK_epsilon:
             STUCK_counttime += timestep
-        # print('STUCK_counttime: ', STUCK_counttime)
+            print('Stuck added by ', timestep)
+        print('Stuck countimt = ', STUCK_counttime, ', dpos = ', dpos_val, ', bumper=', bumpers[0].getValue())
         if (STUCK_counttime > STUCK_thresh) or (bumpers[0].getValue() >0):
             navmodes = [False, True]
         # if  (STUCK_LR_counter > STUCK_LR_thresh) or (bumpers[0].getValue() >0):
@@ -202,7 +231,7 @@ while True:
     # Stuck recuse
     if navmodes[1]:
         print('Stuck recuse: %d'%(STUCK_recusettime))
-        if (STUCK_recusettime > 0) and (bumpers[1].getValue() < 1):
+        if (STUCK_recusettime > 0):
             # Start recusing from STUCK if there was not recuse attempted before
             leftSpeed = base_speed * CHANGEDIR_mat[1, 0]
             rightSpeed = base_speed * CHANGEDIR_mat[1, 1]
@@ -214,6 +243,7 @@ while True:
             STUCK_recusettime = STUCK_recuseMaxT
             # Switch to object avoidance mode
             navmodes = [True, False]
+            vl, vr = 10, 10
 
 
     # CHANGEDIR behaviour
@@ -240,18 +270,18 @@ while True:
     time = int(robot.getTime() * 1e3)
     if (time % thetastep) == 0:
 
-        imgobj = cam.getImage()
-        imgtmp = np.frombuffer(imgobj, np.uint8).reshape((cam.getHeight(), cam.getWidth(), 4))
-        gray = cv.cvtColor(imgtmp, cv.COLOR_BGRA2GRAY)
-        np.save(join(img_dir, '%d.npy'%(time)), gray)
-
-        idlist, maxscore, noveltag = SM.observe(gray)
-        seq.step(idlist)
-        print('Time = %d ms, Thresh=%0.2f' % (timeCounter, SM.newMemoryThresh))
-        print('Num Obs: ', len(SM.obs_list))
-        print('Activated ID: ', idlist)
-        print('Match score: ', maxscore)
-        print('Descriptor sizes:\n', [len(des) for des in SM.obs_list])
+        # imgobj = cam.getImage()
+        # imgtmp = np.frombuffer(imgobj, np.uint8).reshape((cam.getHeight(), cam.getWidth(), 4))
+        # gray = cv.cvtColor(imgtmp, cv.COLOR_BGRA2GRAY)
+        # np.save(join(img_dir, '%d.npy'%(time)), gray)
+        #
+        # idlist, maxscore, noveltag = SM.observe(gray)
+        # seq.step(idlist)
+        # print('Time = %d ms, Thresh=%0.2f' % (timeCounter, SM.newMemoryThresh))
+        # print('Num Obs: ', len(SM.obs_list))
+        # print('Activated ID: ', idlist)
+        # print('Match score: ', maxscore)
+        # print('Descriptor sizes:\n', [len(des) for des in SM.obs_list])
 
 
 
@@ -282,15 +312,15 @@ while True:
         # seq.step(id2list)
         # # ========================================================================================
 
-        data["t"].append(time)
-        data["x"].append(new_pos[0])
-        data["y"].append(new_pos[1])
-        data["z"].append(new_pos[2])
-        data["a"].append(angle)
-        data["objID"].append(idlist)
-        # data["objID_dist"].append(id2list)
-        data['f_sigma'].append(seq.f_sigma.copy())
-        data["X"].append(seq.X)
+        # data["t"].append(time)
+        # data["x"].append(new_pos[0])
+        # data["y"].append(new_pos[1])
+        # data["z"].append(new_pos[2])
+        # data["a"].append(angle)
+        # data["objID"].append(idlist)
+        # # data["objID_dist"].append(id2list)
+        # data['f_sigma'].append(seq.f_sigma.copy())
+        # data["X"].append(seq.X)
         timeCounter_theta = timeCounter
         pass
 
