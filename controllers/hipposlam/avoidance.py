@@ -17,9 +17,9 @@ import numpy as np
 
 
 # Project tags and paths
-save_tag = False
+save_tag = True
 reobserve = False
-project_tag = 'Avoidance_Sift'
+project_tag = 'Avoidance'
 save_dir = join('data', project_tag)
 os.makedirs(save_dir, exist_ok=True)
 img_dir = join(save_dir, 'imgs')
@@ -40,7 +40,7 @@ print('Basic time step = %d ms, Theta time step = %d ms'%(timestep, thetastep))
 camera_timestep = thetastep
 cam = robot.getDevice('camera')
 cam.enable(camera_timestep)
-# cam.recognitionEnable(camera_timestep)
+cam.recognitionEnable(camera_timestep)
 # cam.enableRecognitionSegmentation()
 width = cam.getWidth()
 height = cam.getHeight()
@@ -143,9 +143,12 @@ data = dict(
     x = [],
     y = [],
     z = [],
-    a = [],
+    rotx = [],
+    roty = [],
+    rotz = [],
+    rota = [],
     objID = [],
-    # objID_dist= [],
+    objID_dist= [],
     f_sigma=[],
     X = [],
 
@@ -158,8 +161,9 @@ dt = timestep * 1e-3
 acce_k = 40
 ds_epsilon = 0.1
 while True:
-    print()
+
     sim_state = robot.step(timestep)
+    time_s = robot.getTime()
 
     if sim_state == -1:
         print('Reset pressed')
@@ -178,7 +182,7 @@ while True:
         sys.exit(0)
 
 
-    angle = rotation_field.getSFRotation()[3]
+    rotx, roty, rotz, rota = rotation_field.getSFRotation()
     leftSpeed = base_speed
     rightSpeed = base_speed
     ds_vals = np.array([ds[i].getValue() for i in range(12)])
@@ -191,28 +195,31 @@ while True:
         ds_mask = ds_amp > ds_epsilon
         if np.any(ds_mask):
             ds_amp_mean = np.mean(ds_amp[ds_amp > ds_epsilon])
-            acce_amp = acce_k * ( ds_amp_mean / 100 )
+
+            acce_amp = (acce_k ) * ( ds_amp_mean / 100 )
         else:
             ds_amp_mean = 0
             acce_amp = 0
 
-        # leftSpeed, rightSpeed = convert_steering_to_wheelspeed(steering_a, base_speed)
+        np.random.seed(global_count)
+        acce_noise = np.random.normal(0, 5, size=2)
+
         left_acce, right_acce = convert_steering_to_wheelacceleration_nonlinear(steering_a, acce_amp)
         vl_nat = (10-vl)
         vr_nat = (10-vr)
-        dvl = vl_nat + left_acce
-        dvr = vr_nat + right_acce
+        dvl = vl_nat + left_acce  + acce_noise[0]
+        dvr = vr_nat + right_acce + acce_noise[1]
         vl += dvl * dt
         vr += dvr * dt
         vl = np.clip(vl, a_min=-15, a_max=15)
         vr = np.clip(vr, a_min=-15, a_max=15)
         leftSpeed, rightSpeed = vl, vr
 
-        print('Steering %0.2f, ds_amp_mean=%0.4f, acce_amp=%0.2f'%(np.rad2deg(steering_a), ds_amp_mean, acce_amp))
-        print('vl_nat=%0.4f, vr_nat=%0.4f'%(vl_nat, vr_nat))
-        print('left_acce=%0.4f, right_acce=%0.4f'%(left_acce, right_acce))
-        print('dvl=%0.4f, dvr=%0.4f'%(dvl, dvr))
-        print('leftSpeed=%0.2f, rightSpeed=%0.2f'%(leftSpeed, rightSpeed))
+        # print('Steering %0.2f, ds_amp_mean=%0.4f, acce_amp=%0.2f'%(np.rad2deg(steering_a), ds_amp_mean, acce_amp))
+        # print('vl_nat=%0.4f, vr_nat=%0.4f'%(vl_nat, vr_nat))
+        # print('left_acce=%0.4f, right_acce=%0.4f'%(left_acce, right_acce))
+        # print('dvl=%0.4f, dvr=%0.4f'%(dvl, dvr))
+        # print('leftSpeed=%0.2f, rightSpeed=%0.2f'%(leftSpeed, rightSpeed))
 
 
         # Stuck detection
@@ -220,12 +227,10 @@ while True:
         dpos_val = np.mean(np.abs(dpos))
         if dpos_val < STUCK_epsilon:
             STUCK_counttime += timestep
-            print('Stuck added by ', timestep)
-        print('Stuck countimt = ', STUCK_counttime, ', dpos = ', dpos_val, ', bumper=', bumpers[0].getValue())
+            # print('Stuck added by ', timestep)
+        # print('Stuck countimt = ', STUCK_counttime, ', dpos = ', dpos_val, ', bumper=', bumpers[0].getValue())
         if (STUCK_counttime > STUCK_thresh) or (bumpers[0].getValue() >0):
             navmodes = [False, True]
-        # if  (STUCK_LR_counter > STUCK_LR_thresh) or (bumpers[0].getValue() >0):
-        #     navmodes = [False, True]
 
     
     # Stuck recuse
@@ -258,7 +263,7 @@ while True:
         avoidance_vals = avoidance_vals[np.random.permutation(2)]
         np.random.seed(global_count + 3)
         stuck_ranvec = np.random.permutation(2)
-        stuck_vals = np.array([1, -1])[stuck_ranvec]
+        stuck_vals = np.array([0.5, -0.5])[stuck_ranvec]
         CHANGEDIR_mat = np.vstack([avoidance_vals, stuck_vals])
         CHANGEDIR_count = 0
     else:
@@ -267,14 +272,15 @@ while True:
 
     # Theta
     timediff = timeCounter - timeCounter_theta
-    time = int(robot.getTime() * 1e3)
-    if (time % thetastep) == 0:
+    time_ms = int(time_s * 1e3)
+    if (time_ms % thetastep) == 0:
+        # print('Time = %0.2f ms'%(time_ms))
 
+        # # ======================= Sift scene recognition ======================================
         # imgobj = cam.getImage()
         # imgtmp = np.frombuffer(imgobj, np.uint8).reshape((cam.getHeight(), cam.getWidth(), 4))
         # gray = cv.cvtColor(imgtmp, cv.COLOR_BGRA2GRAY)
-        # np.save(join(img_dir, '%d.npy'%(time)), gray)
-        #
+        # np.save(join(img_dir, '%d.npy'%(time_ms)), gray)
         # idlist, maxscore, noveltag = SM.observe(gray)
         # seq.step(idlist)
         # print('Time = %d ms, Thresh=%0.2f' % (timeCounter, SM.newMemoryThresh))
@@ -282,45 +288,48 @@ while True:
         # print('Activated ID: ', idlist)
         # print('Match score: ', maxscore)
         # print('Descriptor sizes:\n', [len(des) for des in SM.obs_list])
+        # ========================================================================================
 
 
+        # # =========================== Bulti-in object recognition ===========================
+        # Get object ids
+        objs = cam.getRecognitionObjects()
+        idlist = [obj.getId() for obj in objs]
 
-        # # =========================== Object recognition ===========================
-        # # Get object ids
-        # objs = cam.getRecognitionObjects()
-        # idlist = [obj.getId() for obj in objs]
-        #
-        # # Distance from robot to the object
-        # id2list = []
-        # for objid in idlist:
-        #
-        #     # Obtain object position
-        #     obj_node = robot.getFromId(objid)
-        #     objpos = obj_node.getPosition()
-        #
-        #     # Store object positions
-        #     if str(objid) not in fpos_dict:
-        #         fpos_key = '%d'%objid
-        #         fpos_dict[fpos_key] = objpos
-        #         print('Insert Id=%s with position ' % (fpos_key), objpos)
-        #
-        #     # Compute distance
-        #     dist = np.sqrt((new_pos[0] - objpos[0]) ** 2 + (new_pos[1] - objpos[1])**2)
-        #     dist_level = int(dist / dist_sep)  # discretized distance
-        #     id2list.append('%d_%d'%(objid, dist_level))
-        #
-        # seq.step(id2list)
+        # Distance from robot to the object
+        id2list = []
+        for objid in idlist:
+
+            # Obtain object position
+            obj_node = robot.getFromId(objid)
+            objpos = obj_node.getPosition()
+
+            # Store object positions
+            if str(objid) not in fpos_dict:
+                fpos_key = '%d'%objid
+                fpos_dict[fpos_key] = objpos
+                print('Insert Id=%s with position ' % (fpos_key), objpos)
+
+            # Compute distance
+            dist = np.sqrt((new_pos[0] - objpos[0]) ** 2 + (new_pos[1] - objpos[1])**2)
+            dist_level = int(dist / dist_sep)  # discretized distance
+            id2list.append('%d_%d'%(objid, dist_level))
+
+        seq.step(id2list)
         # # ========================================================================================
 
-        # data["t"].append(time)
-        # data["x"].append(new_pos[0])
-        # data["y"].append(new_pos[1])
-        # data["z"].append(new_pos[2])
-        # data["a"].append(angle)
-        # data["objID"].append(idlist)
-        # # data["objID_dist"].append(id2list)
-        # data['f_sigma'].append(seq.f_sigma.copy())
-        # data["X"].append(seq.X)
+        data["t"].append(time_ms)
+        data["x"].append(new_pos[0])
+        data["y"].append(new_pos[1])
+        data["z"].append(new_pos[2])
+        data["rotx"].append(rotx)
+        data["roty"].append(roty)
+        data["rotz"].append(rotz)
+        data["rota"].append(rota)
+        data["objID"].append(idlist)
+        data["objID_dist"].append(id2list)
+        data['f_sigma'].append(seq.f_sigma.copy())
+        data["X"].append(seq.X)
         timeCounter_theta = timeCounter
         pass
 
@@ -336,6 +345,7 @@ while True:
     wheels[1].setVelocity(rightSpeed)
     wheels[2].setVelocity(leftSpeed)
     wheels[3].setVelocity(rightSpeed)
+
 
     CHANGEDIR_count += 1
     pos = new_pos

@@ -42,3 +42,14 @@ def opposite_angle(x):
     else:
         out = x + np.pi
     return out
+
+def divide_ignore(a: np.ndarray, b: np.ndarray):
+    e1, e2, e3, e4 = np.isinf(a).sum(), np.isnan(a).sum(), np.isinf(b).sum(), np.isnan(b).sum()
+    if np.any(np.array([e1, e2, e3, e4]) > 0):
+        raise ValueError('No invalid values (nan and inf) in the inputs a, b are allowed.')
+    else:
+        with np.errstate(divide='ignore', invalid='ignore'):
+            c = a / b
+        c[np.isinf(c)] = 0
+        c[np.isnan(c)] = 0
+    return c
