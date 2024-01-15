@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="2b681761-d73e-41f2-8df8-83cd3162342c" name="HippoSLAM">
+        <fileTransfer rootFolder="/work/ws/nemo/fr_yy1019-hipposlam-0/HippoSLAM" accessType="SFTP" host="login1.nemo.uni-freiburg.de" port="22" sshConfigId="ac23ba0a-e808-4bbc-86fb-60095e0d6402" sshConfig="nemo1" keyPair="true">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>
