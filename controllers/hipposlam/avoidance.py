@@ -173,7 +173,7 @@ while True:
             save_pickle(save_pth, data)
             print('Traj data saved at ' + save_pth)
 
-            meta = dict(stored_f=seq.stored_f, fpos=fpos_dict, dist_level=dist_sep)
+            meta = dict(stored_f=seq.stored_f, fpos=fpos_dict, dist_level=dist_sep, seqR=seq.R, seqL=seq.L)
             save_pth = join(save_dir, 'meta.pickle')
             save_pickle(save_pth, meta)
             print('Meta data saved at ' + save_pth)

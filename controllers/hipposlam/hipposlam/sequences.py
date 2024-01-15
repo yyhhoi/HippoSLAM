@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.signal import convolve
 
 
 class Sequences:
@@ -62,4 +63,17 @@ class Sequences:
                 if sigma < self.L:
                     non_terminal_sigmas.append(sigma)
             self.f_sigma[f_each] = non_terminal_sigmas
+
+    @staticmethod
+    def X2sigma(Xmat, R, sigma_state=False):
+        kernel = np.ones((1, R))
+        sigma_mat = convolve(Xmat, kernel, mode='valid')
+
+        actnum = R if sigma_state else 0
+
+        fnode_rids, sigma_states = np.where(sigma_mat > actnum)
+
+        # sigma should be in the range of [1, L], hence sigma_states + 1
+        return fnode_rids, sigma_states + 1
+
 
