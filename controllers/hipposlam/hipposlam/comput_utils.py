@@ -81,19 +81,23 @@ def MLM(p, d, n, t, minerr=0.01):
     p_out = p.copy()
     d_out = d.copy()
     err = 1000
-
+    i = 0
     while err > minerr:
+        if i % 100 == 0:
+            print(err)
         p_est = divide_ignore(np.mean(n, axis=1), np.mean(d_out.reshape(1, J) * t, axis=1))
         d_est = divide_ignore(np.mean(n, axis=0), np.mean(p_out.reshape(I, 1) * t, axis=0))
 
         # error
-        errd = np.nanmean(d_est - d_out) ** 2
-        errp = np.nanmean(p_est - p_out) ** 2
-        err = np.sqrt(errd + errp)
+        errd = np.mean(np.abs(d_est - d_out))
+        errp = np.mean(np.abs(p_est - p_out))
+        err = errd + errp
 
         # update
         p_out = p_est
         d_out = d_est
+
+        i += 1
 
     return p_out, d_out
 
