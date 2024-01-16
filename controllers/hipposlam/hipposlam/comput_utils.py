@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.stats import vonmises
 
 
 def cmean(x, w=None):
@@ -56,6 +57,65 @@ def divide_ignore(a: np.ndarray, b: np.ndarray):
 
 def midedges(edges):
     return (edges[:-1] + edges[1:]) / 2
+
+
+class Arena:
+    def __init__(self, xmin, xmax, ymin, ymax, amin, amax, dp, da, bodysd):
+        self.xmin = xmin
+        self.xmax = xmax
+        self.ymin = ymin
+        self.ymax = ymax
+        self.amin = amin
+        self.amax = amax
+        self.dp = dp
+        self.da = da
+        self.bodysd = bodysd
+        self.bodysd_ind = self.bodysd/self.dp
+        self.xedges = np.arange(xmin, xmax+dp, dp)
+        self.yedges = np.arange(ymin, ymax+dp, dp)
+        self.aedges = np.arange(-np.pi, np.pi+da, da)
+        self.xedm = midedges(self.xedges)
+        self.yedm = midedges(self.yedges)
+        self.aedm = midedges(self.aedges)
+
+    def compute_histogram3d(self, x, y, a):
+        data3d = np.stack([x, y, a]).T  # (T, 3)
+        H3d, edges3d = np.histogramdd(data3d, bins=[self.xedges, self.yedges, self.aedges])
+        return H3d, edges3d
+
+    def compute_ratemap(self, occ, spcounts):
+        return divide_ignore(spcounts, occ)
+
+def circular_gau_filter(H, a_ax, kappa: float = 12.6):
+    """
+    Filter the 3-d histogram only along the circular dimension (the third axis).
+    Parameters
+    ----------
+    H : ndarray
+        3-d array with shape (Nx, Ny, Na). Histogram count of the x, y, angle in the bins.
+    a_ax : ndarray
+        1-d array with shape (Na, ). Value (or middle points) of the angle bins.
+    kappa : float
+        Kappa of the von-mise distribution. It controls the concentration. Recommend 4*np.pi.
+
+    Returns
+    -------
+    Hout : ndarray
+        3-d array with shape (Nx, Ny, Na). Smoothed histogram of x, y, angle. The sum remains the same.
+    """
+
+    da = a_ax[1] - a_ax[0]
+    Nx, Ny, Na = H.shape
+    Np = Nx * Ny
+    H_flat = H.reshape(Np, Na).T  # (Na, Np)
+    a_axs = np.stack([a_ax] * Np).T  # (Na, Np)
+    Hout = np.zeros(H_flat.shape)  # (Na, Np)
+
+    for i in range(len(a_ax)):
+        Hout += vonmises.pdf(a_axs, kappa, loc=a_ax[i], scale=1) * H_flat[i, :].reshape(1, Np) * da
+    Hout = Hout.T.reshape(Nx, Ny, Na)
+    return Hout
+
 
 def MLM(p, d, n, t, minerr=0.01):
     """
