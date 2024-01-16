@@ -69,7 +69,7 @@ class Sequences:
         kernel = np.ones((1, R))
         sigma_mat = convolve(Xmat, kernel, mode='valid')
 
-        actnum = R if sigma_state else 0
+        actnum = R-1 if sigma_state else 0
 
         fnode_rids, sigma_states = np.where(sigma_mat > actnum)
 

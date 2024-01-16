@@ -5,8 +5,8 @@
       <paths name="HippoSLAM">
         <serverdata>
           <mappings>
-            <mapping deploy="" local="$PROJECT_DIR$/../../../../Program Files/Webots/lib/controller/python" web="/" />
-            <mapping deploy="/" local="$PROJECT_DIR$" web="/" />
+            <mapping local="$PROJECT_DIR$/../../../../Program Files/Webots/lib/controller/python" web="/" />
+            <mapping local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>
