@@ -10,6 +10,12 @@ import matplotlib as mpl
 from matplotlib import cm
 from tqdm import tqdm
 from scipy.ndimage import gaussian_filter
+from scipy.special import factorial
+def logPois(r, k, epsilon=1e-6):
+    out = k * np.log(r+epsilon) - (r+epsilon) - factorial(k)
+    return out
+
+
 
 
 # Paths and data===============
@@ -103,7 +109,7 @@ ensemkey2id = dict()
 for i, ensem_key in enumerate(id2ensemkey):
     ensemkey2id[ensem_key] = i
 
-all_ratemaps = np.zeros((num_ensem, BD.xedm.shape[0], BD.yedm.shape[0]))
+all_ratemaps = np.zeros((num_ensem, BD.xedm.shape[0], BD.yedm.shape[0], BD.aedm.shape[0]))
 
 for i in tqdm(range(num_ensem)):
 
@@ -117,11 +123,11 @@ for i in tqdm(range(num_ensem)):
     ratemap_3d = BD.compute_ratemap(occ, Hsp3d)
     maptmp = gaussian_filter(ratemap_3d, sigma=BD.bodysd_ind, mode='constant', cval=0, axes=(0, 1))
     ratemap_3d_gau = circular_gau_filter(maptmp, a_ax=BD.aedm, kappa=4*np.pi)
+    all_ratemaps[i, :, :, :] = ratemap_3d_gau
 
-    ratemap_pos = ratemap_3d_gau.mean(axis=2)
-    ratemap_a = ratemap_3d_gau.mean(axis=0).mean(axis=0)
     if debug_plot_tag:
-
+        ratemap_pos = ratemap_3d_gau.mean(axis=2)
+        ratemap_a = ratemap_3d_gau.mean(axis=0).mean(axis=0)
         fig, ax = plt.subplots(2, 2, figsize=(10, 8))
         ax[0, 0].pcolormesh(BD.xedges, BD.yedges, ratemap_pos.T, cmap='hot')
         ax[0, 0].scatter(fpos[0], fpos[1], color='g', s=100)
@@ -143,4 +149,44 @@ for i in tqdm(range(num_ensem)):
         fig.tight_layout()
         fig.savefig(join(plot_dir_ratemap, '%d.png'%(i)), dpi=200)
         plt.close(fig)
+
+# Bayesian inference =============================
+
+xML, yML, aML, trajidML = [], [], [], []
+for i in tqdm(range(trajdf.shape[0])):
+    Xmat = trajdf['X'][i]
+
+    if (Xmat.shape[0] < 1):
+        continue
+
+    if (i % 10 == 0):
+
+        act_vec = np.zeros(num_ensem)
+        fnode_ids, sigma_ids = Sequences.X2sigma(Xmat, seqR, sigma_state=False)
+        for fnode_id, sigma_id in zip(fnode_ids, sigma_ids):
+            nodekey = id2fkey_dict[fnode_id]
+            ensem_key = '%s-%d'%(nodekey, sigma_id)
+            ratemap_id = ensemkey2id[ensem_key]
+            act_vec[ratemap_id] = 1
+
+        logL = np.zeros((BD.xedm.shape[0], BD.yedm.shape[0], BD.aedm.shape[0]))
+        for j in range(num_ensem):
+            ratemap = all_ratemaps[j, :, :, :]
+            k = act_vec[j]
+            ratemap_epsilon = ratemap + 1e-7
+            out = k * np.log(ratemap_epsilon) - ratemap_epsilon - factorial(k)
+            logL += out
+
+        maxid1D_logL = np.argmax(logL)
+        maxid3D_logL = np.unravel_index(maxid1D_logL, logL.shape)
+        xML.append(BD.xedm[maxid3D_logL[0]])
+        yML.append(BD.yedm[maxid3D_logL[1]])
+        aML.append(BD.aedm[maxid3D_logL[2]])
+        trajidML.append(i)
+
+BDresults = pd.DataFrame(dict(xML=xML, yML=yML, aML=aML,
+             xGT=trajdf['x'][trajidML].to_list(), yGT=trajdf['y'][trajidML].to_list(), aGT=trajdf['a'][trajidML].to_list()))
+
+BDresults.to_pickle(join(data_dir, 'inferences.pickle'))
+
 
