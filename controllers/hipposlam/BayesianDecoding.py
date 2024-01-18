@@ -159,7 +159,7 @@ for i in tqdm(range(trajdf.shape[0])):
     if (Xmat.shape[0] < 1):
         continue
 
-    if (i % 100 == 0):
+    if (i % 10 == 0):
 
         act_vec = np.zeros(num_ensem)
         fnode_ids, sigma_ids = Sequences.X2sigma(Xmat, seqR, sigma_state=False)
