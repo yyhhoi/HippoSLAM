@@ -19,7 +19,7 @@ def logPois(r, k, epsilon=1e-6):
 
 
 # Paths and data===============
-debug_plot_tag = False
+debug_plot_tag = True
 project_tag = 'Avoidance'
 data_dir = join('data', project_tag)
 plot_dir = join('plots', project_tag, 'BayesianDecoding')
@@ -60,7 +60,7 @@ if debug_plot_tag:
     im1 = ax1.pcolormesh(BD.xedges, BD.yedges, occ_p.T, cmap='hot')
     cb = fig.colorbar(im1, cax=cbar_ax)
     ax2.bar(BD.aedm, occ_a, width=da)
-    fig.savefig(join(plot_dir, 'Occupancy'))
+    fig.savefig(join(plot_dir, 'Occupancy.png'))
 
 # Organize Spike Data ====================
 Num_Fnodes = trajdf['X_Nrow'].max()
@@ -128,28 +128,31 @@ for i in tqdm(range(num_ensem)):
     if debug_plot_tag:
         ratemap_pos = ratemap_3d_gau.mean(axis=2)
         ratemap_a = ratemap_3d_gau.mean(axis=0).mean(axis=0)
-        fig, ax = plt.subplots(2, 2, figsize=(10, 8))
-        ax[0, 0].pcolormesh(BD.xedges, BD.yedges, ratemap_pos.T, cmap='hot')
-        ax[0, 0].scatter(fpos[0], fpos[1], color='g', s=100)
-        ax[0, 0].quiver(xsp, ysp, np.cos(asp), np.sin(asp), color='b', alpha=0.5)
-        ax[0, 0].set_xlim(xmin, xmax)
-        ax[0, 0].set_ylim(ymin, ymax)
-        ax[0, 0].set_title(ensem_key)
 
-        ax[0, 1].bar(BD.aedm, ratemap_3d.mean(axis=0).mean(axis=0), width=da, alpha=0.5)
-        ax[0, 1].plot(BD.aedm, ratemap_a, c='k')
-        ax[0, 1].set_xticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi])
-        ax[0, 1].set_xticks(np.arange(-np.pi, np.pi + np.pi/4, np.pi/4), minor=True)
-        ax[0, 1].set_xticklabels(['-180', '-90', '0', '90', '180'])
-        im = ax[1, 0].pcolormesh(BD.xedges, BD.yedges, ratemap_pos.T, cmap='hot')
-        plt.colorbar(im)
+        fig = plt.figure(figsize=(8, 4), facecolor='w')
+        ax1 = fig.add_axes([0.05, 0.2, 0.4, 0.7])
+        ax2 = fig.add_axes([0.55, 0.2, 0.4, 0.6], polar=True)
+        cbar_ax = fig.add_axes([0.46, 0.2, 0.03, 0.7])
 
-        ax[1, 1].axis('off')
 
-        fig.tight_layout()
+        im1 = ax1.pcolormesh(BD.xedges, BD.yedges, ratemap_pos.T, cmap='jet')
+        ax1.scatter(fpos[0], fpos[1], color='g', s=100)
+        r = 2
+        ax1.quiver(xsp, ysp, r* np.cos(asp), r*np.sin(asp), color='r', alpha=0.5, scale=75)
+        ax1.set_xlim(xmin, xmax)
+        ax1.set_ylim(ymin, ymax)
+        ax1.set_title(ensem_key)
+        cb = fig.colorbar(im1, cax=cbar_ax)
+
+        ax2.bar(BD.aedm, ratemap_3d.mean(axis=0).mean(axis=0), width=da, alpha=0.5)
+        ax2.plot(BD.aedm, ratemap_a, c='k')
+        # ax2.set_xticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi])
+        # ax2.set_xticks(np.arange(-np.pi, np.pi + np.pi/4, np.pi/4), minor=True)
+        # ax2.set_xticklabels(['-180', '-90', '0', '90', '180'])
+
         fig.savefig(join(plot_dir_ratemap, '%d.png'%(i)), dpi=200)
         plt.close(fig)
-
+        # raise ValueError
 # Bayesian inference =============================
 
 xML, yML, aML, trajidML = [], [], [], []
