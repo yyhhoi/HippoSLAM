@@ -11,7 +11,6 @@ from controller import Supervisor
 from hipposlam.vision import SiftMemory
 from hipposlam.kinematics import compute_steering, convert_steering_to_wheelspeed, convert_steering_to_wheelacceleration_nonlinear
 
-import cv2 as cv
 
 import numpy as np
 
@@ -19,7 +18,7 @@ import numpy as np
 # Project tags and paths
 save_tag = True
 reobserve = False
-project_tag = 'Avoidance'
+project_tag = 'Avoidance_CloseObjs_theta1024'
 save_dir = join('data', project_tag)
 os.makedirs(save_dir, exist_ok=True)
 img_dir = join(save_dir, 'imgs')
@@ -33,7 +32,7 @@ rotation_field = agent_node.getField('rotation')
 
 # get the time step of the current world.
 timestep = int(robot.getBasicTimeStep())
-thetastep = 128
+thetastep = 1024
 print('Basic time step = %d ms, Theta time step = %d ms'%(timestep, thetastep))
 
 # Get Camera
@@ -134,8 +133,8 @@ timeCounter_cam = 0
 global_count = 0
 navmodes = [True, False]  # [Obstacle avoidance, Stuck recuse]
 floor_diag = (7.7 **2 + 12.9 ** 2) ** (1/2)
-dist_sep = floor_diag / 7
-
+dist_sep = floor_diag / 4
+obj_dist = 2
 
 # Data Storage
 data = dict(
@@ -173,7 +172,7 @@ while True:
             save_pickle(save_pth, data)
             print('Traj data saved at ' + save_pth)
 
-            meta = dict(stored_f=seq.stored_f, fpos=fpos_dict, dist_level=dist_sep, seqR=seq.R, seqL=seq.L)
+            meta = dict(stored_f=seq.stored_f, fpos=fpos_dict, dist_level=dist_sep, seqR=seq.R, seqL=seq.L, obj_dist=obj_dist)
             save_pth = join(save_dir, 'meta.pickle')
             save_pickle(save_pth, meta)
             print('Meta data saved at ' + save_pth)
@@ -235,7 +234,7 @@ while True:
     
     # Stuck recuse
     if navmodes[1]:
-        print('Stuck recuse: %d'%(STUCK_recusettime))
+        # print('Stuck recuse: %d'%(STUCK_recusettime))
         if (STUCK_recusettime > 0):
             # Start recusing from STUCK if there was not recuse attempted before
             leftSpeed = base_speed * CHANGEDIR_mat[1, 0]
@@ -253,7 +252,7 @@ while True:
 
     # CHANGEDIR behaviour
     if CHANGEDIR_count > CHANGEDIR_thresh:
-        print('Change mat')
+        # print('Change mat')
         np.random.seed(global_count)
         negval = np.random.uniform(-1, 0)
         np.random.seed(global_count + 1)
@@ -298,6 +297,7 @@ while True:
 
         # Distance from robot to the object
         id2list = []
+        closeIDlist = []
         for objid in idlist:
 
             # Obtain object position
@@ -312,10 +312,14 @@ while True:
 
             # Compute distance
             dist = np.sqrt((new_pos[0] - objpos[0]) ** 2 + (new_pos[1] - objpos[1])**2)
-            dist_level = int(dist / dist_sep)  # discretized distance
-            id2list.append('%d_%d'%(objid, dist_level))
+            print('Dist = %0.2f, obj_dist = %0.2f'%(dist, obj_dist))
+            if dist < obj_dist:
+                print('%d added'%(objid))
+                closeIDlist.append('%d'%(objid))
+            # dist_level = int(dist / dist_sep)  # discretized distance
+            # id2list.append('%d_%d'%(objid, dist_level))
 
-        seq.step(id2list)
+        seq.step(closeIDlist)
         # # ========================================================================================
 
         data["t"].append(time_ms)

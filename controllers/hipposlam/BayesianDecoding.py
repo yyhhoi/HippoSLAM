@@ -20,14 +20,12 @@ def logPois(r, k, epsilon=1e-6):
 
 # Paths and data===============
 debug_plot_tag = True
-project_tag = 'Avoidance'
+project_tag = 'Avoidance_CloseObjs_theta1024'
 data_dir = join('data', project_tag)
 plot_dir = join('plots', project_tag, 'BayesianDecoding')
 os.makedirs(plot_dir, exist_ok=True)
 trajdata = read_pickle(join(data_dir, 'traj.pickle'))
 metadata = read_pickle(join(data_dir, 'meta.pickle'))
-metadata['seqR'] = 5 # For now. Remove this line next time after seqR is stored in the metadata
-metadata['seqL'] = 10 # For now. Remove this line next time after seqL is stored in the metadata
 seqR = metadata['seqR']
 seqL = metadata['seqL']
 fkey2id_dict = metadata['stored_f']
@@ -54,10 +52,10 @@ occ_p = occ.sum(axis=2)
 occ_a = occ.sum(axis=0).sum(axis=0)
 if debug_plot_tag:
     fig = plt.figure(figsize=(8, 4), facecolor='w')
-    ax1 = fig.add_axes([0, 0, 0.4, 0.9])
-    ax2 = fig.add_axes([0.6, 0, 0.3, 0.6], polar=True)
-    cbar_ax = fig.add_axes([0.41, 0, 0.04, 0.9])
-    im1 = ax1.pcolormesh(BD.xedges, BD.yedges, occ_p.T, cmap='hot')
+    ax1 = fig.add_axes([0.05, 0.2, 0.4, 0.7])
+    ax2 = fig.add_axes([0.55, 0.2, 0.4, 0.6], polar=True)
+    cbar_ax = fig.add_axes([0.46, 0.2, 0.03, 0.7])
+    im1 = ax1.pcolormesh(BD.xedges, BD.yedges, occ_p.T, cmap='jet')
     cb = fig.colorbar(im1, cax=cbar_ax)
     ax2.bar(BD.aedm, occ_a, width=da)
     fig.savefig(join(plot_dir, 'Occupancy.png'))
