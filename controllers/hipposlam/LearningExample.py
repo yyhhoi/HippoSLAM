@@ -5,8 +5,8 @@ from controller import Robot, Motor
 from controller import Supervisor
 import gym
 import numpy as np
-from stable_baselines3.common.env_checker import check_env
-from stable_baselines3 import DQN
+# from stable_baselines3.common.env_checker import check_env
+from stable_baselines3 import PPO
 # import os
 #
 # os.environ["WEBOTS_HOME"] = r"C:\Users\Hoi\AppData\Local\Programs\Webots"
@@ -18,13 +18,13 @@ class SimpleQ(Supervisor, gym.Env):
     def __init__(self, max_episode_steps=1000):
         super().__init__()
 
+        # X < 2
+
         # Open AI Gym generic
-        high = np.array(
-            [3, 3],
-            dtype=np.float64
-        )
+        lowBox = np.array([-7, -3, -1, -1, -1, -2*np.pi], dtype=np.float64)
+        highBox = np.array([7, 5,   1,  1,  1,  2*np.pi], dtype=np.float64)
         
-        self.observation_space = gym.spaces.Box(-high, high, dtype=np.float64)
+        self.observation_space = gym.spaces.Box(lowBox, highBox, dtype=np.float64)
         self.state = None
         self.spec = gym.envs.registration.EnvSpec(id='WeBotsQ-v0', max_episode_steps=max_episode_steps)
 
@@ -32,18 +32,21 @@ class SimpleQ(Supervisor, gym.Env):
         self.supervis = self.getSelf()
 
         # Robot
-        self.leftMotor = self.getDevice('rear left wheel motor')
-        self.rightMotor = self.getDevice('rear right wheel motor')
-        self.MAX_SPEED = 10*2 # 6.28 * 2
+        self.leftMotor1 = self.getDevice('wheel1')
+        self.leftMotor2 = self.getDevice('wheel3')
+        self.rightMotor1 = self.getDevice('wheel2')
+        self.rightMotor2 = self.getDevice('wheel4')
+        self.MAX_SPEED = 15
 
         # Action - 'Forward', 'back', 'left', 'right'
-        self.action_space = gym.spaces.Discrete(4)
-        self.move_d = 1 * self.MAX_SPEED
+        self.action_space = gym.spaces.Discrete(3)
+        self.turn_steps = 10
+        self.forward_steps = 20
+        self.move_d = self.MAX_SPEED *2/3
         self._action_to_direction = {
-            0: np.array([self.move_d, self.move_d]),
-            1: np.array([-self.move_d, -self.move_d]),
-            2: np.array([self.move_d, self.move_d*0.4]),
-            3: np.array([self.move_d*0.4, self.move_d])
+            0: np.array([self.move_d, self.move_d]),   # Forward
+            1: np.array([-self.move_d, self.move_d]),  # Left turn
+            2: np.array([self.move_d, -self.move_d]),  # Right turn
         }
 
         # Environment specific
@@ -59,8 +62,9 @@ class SimpleQ(Supervisor, gym.Env):
 
 
     def get_obs(self):
-        
-        return np.array(self.supervis.getField('translation').getSFVec3f())[:2]
+        rotx, roty, rotz, rota = self.supervis.getField('rotation').getSFRotation()
+        x, y, z = self.supervis.getField('translation').getSFVec3f()
+        return np.array([x, y, rotx, roty, rotz, rota])
     
     def reset(self):
         # Reset the simulation
@@ -70,11 +74,14 @@ class SimpleQ(Supervisor, gym.Env):
 
         # Reset position and velocity
         translation_field = self.supervis.getField('translation')
-        translation_field.setSFVec3f([0, -0.5, 0])
-        self.leftMotor.setVelocity(0)
-        self.rightMotor.setVelocity(0)
-        self.leftMotor.setPosition(float('inf'))
-        self.rightMotor.setPosition(float('inf'))
+        translation_field.setSFVec3f([4.18, 2.82, 0.07])
+        # translation_field.setSFVec3f([4.18, -1, 0.07])
+        rotation_field = self.supervis.getField('rotation')
+        rotation_field.setSFRotation(([0, 0, -1, 1.57]))
+        # rotation_field.setSFRotation(([0, 0, -1, 3.14]))
+        for motor in [self.leftMotor1, self.leftMotor2, self.rightMotor1, self.rightMotor2]:
+            motor.setVelocity(0)
+            motor.setPosition(float('inf'))
 
         # Internals
         super().step(self.__timestep)
@@ -97,22 +104,27 @@ class SimpleQ(Supervisor, gym.Env):
         # else:
         #     translation_field.setSFVec3f(list(new_pos))
         leftd, rightd = self._action_to_direction[action]
-        self.leftMotor.setVelocity(leftd)
-        self.rightMotor.setVelocity(rightd)
+        self.leftMotor1.setVelocity(leftd)
+        self.leftMotor2.setVelocity(leftd)
+        self.rightMotor1.setVelocity(rightd)
+        self.rightMotor2.setVelocity(rightd)
 
+        numsteps = self.forward_steps if action == 0 else self.turn_steps
+        for counter in range(numsteps):
+            super().step(self.__timestep)
 
-        super().step(self.__timestep * 25)
-
-        new_x, new_y = self.get_obs()
+        new_x, new_y, rotx, roty, _, _ = self.get_obs()
         # Done
-        done = bool(
-            ((new_x < 2.4) & (new_x > 0)) & ((new_y < 2.4) & (new_y > 0))
-        )
+        done = bool(new_x < 2)
 
         # Reward
-        reward = 1 if done else -1
+        reward = 1 if done else 0
         if done:
             print('Goal reached!')
+
+        if (np.abs(rotx) > 0.5) or (np.abs(roty) > 0.5):
+            self.reset()
+
 
         return self.get_obs(), reward, done, {}
 
@@ -126,27 +138,29 @@ def main():
 
     env = SimpleQ()
     env.reset()
-    env.step(0)
-    env.step(1)
-    env.step(2)
-    env.step(3)
-    # check_env(env)
+    # for i in range(18):
+    #     env.step(0)
+    # for i in range(3):
+    #     env.step(2)
+    # for i in range(10):
+    #     env.step(0)
+    #
 
-    # # Train
-    # model = DQN('MlpPolicy', env, verbose=1, exploration_initial_eps=0.5, learning_rate=0.01)
-    # model.learn(total_timesteps=1e5)
+    # Train
+    model = PPO('MlpPolicy', env, verbose=1, learning_rate=0.01)
+    model.learn(total_timesteps=2e5)
     #
-    # # Replay
-    # print('Training is finished, press `Y` for replay...')
-    # env.wait_keyboard()
+    # Replay
+    print('Training is finished, press `Y` for replay...')
+    env.wait_keyboard()
     #
-    # obs = env.reset()
-    # for _ in range(100000):
-    #     action, _states = model.predict(obs)
-    #     obs, reward, done, info = env.step(action)
-    #     print(obs, reward, done, info)
-    #     if done:
-    #         obs = env.reset()
+    obs = env.reset()
+    for _ in range(100000):
+        action, _states = model.predict(obs)
+        obs, reward, done, info = env.step(action)
+        print(obs, reward, done, info)
+        if done:
+            obs = env.reset()
 
     # print(env.get_obs())
     # steps = [0] * 6 + [1] * 4
