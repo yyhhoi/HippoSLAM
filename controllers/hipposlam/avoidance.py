@@ -9,7 +9,7 @@ from hipposlam.sequences import Sequences
 from hipposlam.utils import save_pickle
 from controller import Supervisor
 from hipposlam.vision import SiftMemory
-from hipposlam.kinematics import compute_steering, convert_steering_to_wheelspeed, convert_steering_to_wheelacceleration_nonlinear
+from hipposlam.kinematics import compute_steering, convert_steering_to_wheelacceleration_nonlinear
 
 
 import numpy as np
@@ -18,7 +18,7 @@ import numpy as np
 # Project tags and paths
 save_tag = True
 reobserve = False
-project_tag = 'Avoidance_CloseObjs_theta1024'
+project_tag = 'Avoidance_CombinedCues_theta1024'
 save_dir = join('data', project_tag)
 os.makedirs(save_dir, exist_ok=True)
 img_dir = join(save_dir, 'imgs')
@@ -187,6 +187,8 @@ while True:
     ds_vals = np.array([ds[i].getValue() for i in range(12)])
     new_pos = np.array(translation_field.getSFVec3f())
 
+    if (np.abs(rotx) > 0.5) or (np.abs(roty) > 0.5):
+        robot.reset()
 
     # Obstacle avoidance
     if navmodes[0]:
@@ -298,6 +300,7 @@ while True:
         # Distance from robot to the object
         id2list = []
         closeIDlist = []
+        farIDlist = []
         for objid in idlist:
 
             # Obtain object position
@@ -314,12 +317,20 @@ while True:
             dist = np.sqrt((new_pos[0] - objpos[0]) ** 2 + (new_pos[1] - objpos[1])**2)
             print('Dist = %0.2f, obj_dist = %0.2f'%(dist, obj_dist))
             if dist < obj_dist:
-                print('%d added'%(objid))
+                print('Close object %d added'%(objid))
                 closeIDlist.append('%d'%(objid))
+            else:
+                print('Distant object %d added' % (objid))
+                farIDlist.append('%d'%objid)
+
+            close_to_dist_list = []
+            for c in closeIDlist:
+                for d in farIDlist:
+                    cd = c + "_" + d
+                    close_to_dist_list.append(cd)
             # dist_level = int(dist / dist_sep)  # discretized distance
             # id2list.append('%d_%d'%(objid, dist_level))
-
-        seq.step(closeIDlist)
+        seq.step(close_to_dist_list)
         # # ========================================================================================
 
         data["t"].append(time_ms)

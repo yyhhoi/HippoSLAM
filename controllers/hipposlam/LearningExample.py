@@ -21,17 +21,19 @@ class SimpleQ(Supervisor, gym.Env):
         # X < 2
 
         # Open AI Gym generic
-        lowBox = np.array([-7, -3, -1, -1, -1, -2*np.pi], dtype=np.float64)
-        highBox = np.array([7, 5,   1,  1,  1,  2*np.pi], dtype=np.float64)
-        
+        lowBox = np.array([-7, -3, -1, -1, -1, -2 * np.pi], dtype=np.float64)
+        highBox = np.array([7, 5, 1, 1, 1, 2 * np.pi], dtype=np.float64)
+
         self.observation_space = gym.spaces.Box(lowBox, highBox, dtype=np.float64)
         self.state = None
         self.spec = gym.envs.registration.EnvSpec(id='WeBotsQ-v0', max_episode_steps=max_episode_steps)
 
         # Supervisor
         self.supervis = self.getSelf()
+        self.translation_field = self.supervis.getField('translation')
+        self.rotation_field = self.supervis.getField('rotation')
 
-        # Robot
+        # Wheels
         self.leftMotor1 = self.getDevice('wheel1')
         self.leftMotor2 = self.getDevice('wheel3')
         self.rightMotor1 = self.getDevice('wheel2')
@@ -42,9 +44,9 @@ class SimpleQ(Supervisor, gym.Env):
         self.action_space = gym.spaces.Discrete(3)
         self.turn_steps = 10
         self.forward_steps = 20
-        self.move_d = self.MAX_SPEED *2/3
+        self.move_d = self.MAX_SPEED * 2 / 3
         self._action_to_direction = {
-            0: np.array([self.move_d, self.move_d]),   # Forward
+            0: np.array([self.move_d, self.move_d]),  # Forward
             1: np.array([-self.move_d, self.move_d]),  # Left turn
             2: np.array([self.move_d, -self.move_d]),  # Right turn
         }
@@ -60,12 +62,11 @@ class SimpleQ(Supervisor, gym.Env):
         while self.keyboard.getKey() != ord('Y'):
             super().step(self.__timestep)
 
-
     def get_obs(self):
-        rotx, roty, rotz, rota = self.supervis.getField('rotation').getSFRotation()
-        x, y, z = self.supervis.getField('translation').getSFVec3f()
+        rotx, roty, rotz, rota = self._get_rotation()
+        x, y, z = self._get_translation()
         return np.array([x, y, rotx, roty, rotz, rota])
-    
+
     def reset(self):
         # Reset the simulation
         self.simulationResetPhysics()
@@ -73,12 +74,8 @@ class SimpleQ(Supervisor, gym.Env):
         super().step(self.__timestep)
 
         # Reset position and velocity
-        translation_field = self.supervis.getField('translation')
-        translation_field.setSFVec3f([4.18, 2.82, 0.07])
-        # translation_field.setSFVec3f([4.18, -1, 0.07])
-        rotation_field = self.supervis.getField('rotation')
-        rotation_field.setSFRotation(([0, 0, -1, 1.57]))
-        # rotation_field.setSFRotation(([0, 0, -1, 3.14]))
+        self._set_translation(4.18, 2.82, 0.07)
+        self._set_rotation(0, 0, -1, 1.57)
         for motor in [self.leftMotor1, self.leftMotor2, self.rightMotor1, self.rightMotor2]:
             motor.setVelocity(0)
             motor.setPosition(float('inf'))
@@ -90,25 +87,12 @@ class SimpleQ(Supervisor, gym.Env):
         return self.get_obs()
 
     def step(self, action):
-        # # Execute the action
-        # translation_field = self.supervis.getField('translation')
-        # current_pos = np.array(translation_field.getSFVec3f())
-        # new_pos = current_pos + self._action_to_direction[action]
-        # new_x, new_y = new_pos[0], new_pos[1]
-        #
-        # if (new_x > 2) or (new_x < -2) or (new_y > 2) or (new_y < -2):
-        #     # print('Current pos: ', np.around(self.get_obs(), 4))
-        #     # print('Next pos: ', np.around(new_pos, 4))
-        #     # print('Pass')
-        #     pass
-        # else:
-        #     translation_field.setSFVec3f(list(new_pos))
+
         leftd, rightd = self._action_to_direction[action]
         self.leftMotor1.setVelocity(leftd)
         self.leftMotor2.setVelocity(leftd)
         self.rightMotor1.setVelocity(rightd)
         self.rightMotor2.setVelocity(rightd)
-
         numsteps = self.forward_steps if action == 0 else self.turn_steps
         for counter in range(numsteps):
             super().step(self.__timestep)
@@ -125,12 +109,18 @@ class SimpleQ(Supervisor, gym.Env):
         if (np.abs(rotx) > 0.5) or (np.abs(roty) > 0.5):
             self.reset()
 
-
         return self.get_obs(), reward, done, {}
 
-
-    def step_unmoved(self):
-        return super().step(self.__timestep)
+    def _get_translation(self):
+        return self.translation_field.getSFVec3f()
+    def _get_rotation(self):
+        return self.rotation_field.getSFRotation()
+    def _set_translation(self, x, y, z):
+        self.translation_field.setSFVec3f([x, y, z])
+        return None
+    def _set_rotation(self, rotx, roty, rotz, rota):
+        self.rotation_field.setSFRotation([rotx, roty, rotz, rota])
+        return None
 
 
 def main():

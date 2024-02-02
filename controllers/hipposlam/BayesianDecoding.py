@@ -20,7 +20,7 @@ def logPois(r, k, epsilon=1e-6):
 
 # Paths and data===============
 debug_plot_tag = True
-project_tag = 'Avoidance_CloseObjs_theta1024'
+project_tag = 'Avoidance_CombinedCues_theta1024'
 data_dir = join('data', project_tag)
 plot_dir = join('plots', project_tag, 'BayesianDecoding')
 os.makedirs(plot_dir, exist_ok=True)
