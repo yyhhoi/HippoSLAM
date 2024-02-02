@@ -40,9 +40,9 @@ camera_timestep = thetastep
 cam = robot.getDevice('camera')
 cam.enable(camera_timestep)
 cam.recognitionEnable(camera_timestep)
-# cam.enableRecognitionSegmentation()
 width = cam.getWidth()
 height = cam.getHeight()
+# cam.enableRecognitionSegmentation()
 
 # Sift scene recognition
 newMemoryThresh = 0.1
@@ -188,7 +188,9 @@ while True:
     new_pos = np.array(translation_field.getSFVec3f())
 
     if (np.abs(rotx) > 0.5) or (np.abs(roty) > 0.5):
-        robot.reset()
+        print(rotx, roty, rotz, rota)
+    #     robot.simulationResetPhysics()
+    #     robot.simulationReset()
 
     # Obstacle avoidance
     if navmodes[0]:
@@ -311,23 +313,23 @@ while True:
             if str(objid) not in fpos_dict:
                 fpos_key = '%d'%objid
                 fpos_dict[fpos_key] = objpos
-                print('Insert Id=%s with position ' % (fpos_key), objpos)
+                # print('Insert Id=%s with position ' % (fpos_key), objpos)
 
             # Compute distance
             dist = np.sqrt((new_pos[0] - objpos[0]) ** 2 + (new_pos[1] - objpos[1])**2)
-            print('Dist = %0.2f, obj_dist = %0.2f'%(dist, obj_dist))
+            # print('Dist = %0.2f, obj_dist = %0.2f'%(dist, obj_dist))
             if dist < obj_dist:
-                print('Close object %d added'%(objid))
+                # print('Close object %d added'%(objid))
                 closeIDlist.append('%d'%(objid))
             else:
-                print('Distant object %d added' % (objid))
+                # print('Distant object %d added' % (objid))
                 farIDlist.append('%d'%objid)
 
-            close_to_dist_list = []
-            for c in closeIDlist:
-                for d in farIDlist:
-                    cd = c + "_" + d
-                    close_to_dist_list.append(cd)
+        close_to_dist_list = []
+        for c in closeIDlist:
+            for d in farIDlist:
+                cd = c + "_" + d
+                close_to_dist_list.append(cd)
             # dist_level = int(dist / dist_sep)  # discretized distance
             # id2list.append('%d_%d'%(objid, dist_level))
         seq.step(close_to_dist_list)
