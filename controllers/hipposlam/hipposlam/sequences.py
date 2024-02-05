@@ -42,6 +42,12 @@ class Sequences:
                 self.num_f += 1
             else:
                 ValueError('Unknown case. Feature nodes not recognised.')
+    def reset(self):
+        for f_each in self.f_sigma.keys():
+            self.f_sigma[f_each] = []
+        self.current_f = []
+        self.X = np.zeros((self.num_f, self.X_Ncol), dtype=int)
+        self.iter = 0
 
     def propagate_sigma_update_X(self):
         self.X = np.zeros((self.num_f, self.X_Ncol), dtype=int)

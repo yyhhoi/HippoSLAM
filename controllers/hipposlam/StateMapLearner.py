@@ -68,7 +68,7 @@ class SimpleQ(Supervisor, gym.Env):
         # hippoSlam
         self.fpos_dict = dict()
         self.obj_dist = 2  # in meters
-        R, L = 5, 10
+        R, L = 5, 2
         self.seq = Sequences(R=R, L=L, reobserve=False)
         self.HL = HippoLearner(R, L, L)
 
@@ -76,15 +76,20 @@ class SimpleQ(Supervisor, gym.Env):
         self.keyboard = self.getKeyboard()
         self.keyboard.enable(self.__timestep)
 
+        # Data I/O
+        self.io_pth = "data/statemaps.txt"
+        with open(self.io_pth, mode='w') as f:
+            f.write('t, sid,x,y,rotz,rota,done,reward\n')
+
     def wait_keyboard(self):
         while self.keyboard.getKey() != ord('Y'):
             super().step(self.__timestep)
 
     def get_obs(self):
-        sid, snodes = self.HL.infer_state(self.seq.X)
-        # rotx, roty, rotz, rota = self._get_rotation()
-        # x, y, z = self._get_translation()
-        # return np.array([x, y, rotx, roty, rotz, rota])
+        id_list = self.recognize_objects()
+        self.seq.step(id_list)
+        self.HL.step(self.seq.X)
+        sid, _ = self.HL.infer_state(self.seq.X)
         return sid
 
     def reset(self):
@@ -94,20 +99,33 @@ class SimpleQ(Supervisor, gym.Env):
         super().step(self.__timestep)
 
         # Reset position and velocity
+        x = np.random.uniform(3.45, 6.3, size=1)
+        y = np.random.uniform(1.35, 3.85, size=1)
+        a = np.random.uniform(-np.pi, np.pi, size=1)
         self.stuck_m = 0
-        self._set_translation(4.18, 2.82, 0.07)
-        self._set_rotation(0, 0, -1, 1.57)
+        self._set_translation(x, y, 0.07)  # 4.18, 2.82, 0.07
+        self._set_rotation(0, 0, -1, a)  # 0, 0, -1, 1.57
         x, y, _ = self._get_translation()
         self.x, self.y = x, y
         for motor in [self.leftMotor1, self.leftMotor2, self.rightMotor1, self.rightMotor2]:
             motor.setVelocity(0)
             motor.setPosition(float('inf'))
+        # Reset hipposlam
+        self.seq.reset()
+
+        # Infer the first step
+        sid = self.get_obs()
+
+        # IO
+        with open(self.io_pth, 'a') as f:
+
+            f.write('%d,%d,%0.3f,%0.3f,%0.3f,%0.3f,%d,%d\n' % (self.getTime(), sid, x, y, -1, a, 0, 0))
 
         # Internals
         super().step(self.__timestep)
 
         # Open AI Gym generic
-        return self.get_obs()
+        return sid
 
     def step(self, action):
 
@@ -118,14 +136,12 @@ class SimpleQ(Supervisor, gym.Env):
         self.rightMotor2.setVelocity(rightd)
         super().step(self.thetastep)
 
-        id_list = self.recognize_objects()
-        self.seq.step(id_list)
-        self.HL.step(self.seq.X)
+
         sid = self.get_obs()
 
 
         new_x, new_y, _ = self._get_translation()
-        rotx, roty, _, _ = self._get_rotation()
+        rotx, roty, rotz, rota = self._get_rotation()
         fallen = (np.abs(rotx) > 0.5) | (np.abs(roty) > 0.5)
         dpos = np.sqrt((new_x-self.x)**2 + (new_y - self.y)**2)
         stuck_count = dpos < self.stuck_epsilon
@@ -133,6 +149,7 @@ class SimpleQ(Supervisor, gym.Env):
         stuck = self.stuck_m > self.stuck_thresh
         print('Interred state = %d/%d, dpos = %0.8f, %s, stuck_m = %0.4f' % (sid, self.HL.N, dpos, str(stuck_count), self.stuck_m))
         self.x, self.y = new_x, new_y
+
 
         # Done
         done = bool((new_x < 2) or (new_y < 0))
@@ -147,6 +164,12 @@ class SimpleQ(Supervisor, gym.Env):
             print("\n================== Robot has %s ==============================================\n"%msg)
             reward = -1
             done = True
+
+        # IO
+
+        with open(self.io_pth, 'a') as f:
+            f.write('%d, %d,%0.3f,%0.3f,%0.3f,%0.3f,%d,%d\n'%(self.getTime(), sid, new_x, new_y, rotz, rota, int(done), reward))
+
 
 
         return sid, reward, done, {}
@@ -187,6 +210,8 @@ class SimpleQ(Supervisor, gym.Env):
                 cd = c + "_" + d
                 close_to_dist_list.append(cd)
         return close_to_dist_list
+
+
 
     def _get_translation(self):
         return self.translation_field.getSFVec3f()
