@@ -42,7 +42,7 @@ class Sequences:
                 self.num_f += 1
             else:
                 ValueError('Unknown case. Feature nodes not recognised.')
-    def reset(self):
+    def reset_activity(self):
         for f_each in self.f_sigma.keys():
             self.f_sigma[f_each] = []
         self.current_f = []
@@ -145,6 +145,8 @@ class HippoLearner:
         """
         newF = X.shape[0]
         # Conditions trigger learning
+        newF_tag = newF > self.current_F
+
         # if (newF > self.current_F) or ((self.current_Sval < 0.9) and X.sum() > 1):
         if (newF > self.current_F):
             if  (self.learn_l == 0) and (self.learn_mode==False) :

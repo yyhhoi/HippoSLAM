@@ -7,9 +7,10 @@ import gym
 import numpy as np
 # from stable_baselines3.common.env_checker import check_env
 from stable_baselines3 import PPO
-
 from controllers.hipposlam.hipposlam.sequences import Sequences, HippoLearner
 
+import os
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 class SimpleQ(Supervisor, gym.Env):
     def __init__(self, max_episode_steps=1000):
@@ -21,6 +22,9 @@ class SimpleQ(Supervisor, gym.Env):
 
         # self.observation_space = gym.spaces.Box(0, 1000, dtype=np.int)
         self.observation_space = gym.spaces.Discrete(1000)
+        # self.obs_dim = 200
+        # self.observation_space = gym.spaces.Box(0, 100, shape=(self.obs_dim,))
+
         self.state = None
         self.spec = gym.envs.registration.EnvSpec(id='WeBotsQ-v0', max_episode_steps=max_episode_steps)
 
@@ -28,12 +32,14 @@ class SimpleQ(Supervisor, gym.Env):
         self.supervis = self.getSelf()
         self.translation_field = self.supervis.getField('translation')
         self.rotation_field = self.supervis.getField('rotation')
+        self.fallen = False
+        self.fallen_seq = 0
 
         # Self position
         self.x, self.y = None, None
         self.stuck_m = 0
         self.stuck_epsilon = 0.0001
-        self.stuck_thresh = 9
+        self.stuck_thresh = 8
 
         # Environment specific
         self.__timestep = int(self.getBasicTimeStep())  # default 32ms
@@ -68,7 +74,7 @@ class SimpleQ(Supervisor, gym.Env):
         # hippoSlam
         self.fpos_dict = dict()
         self.obj_dist = 2  # in meters
-        R, L = 5, 2
+        R, L = 5, 10
         self.seq = Sequences(R=R, L=L, reobserve=False)
         self.HL = HippoLearner(R, L, L)
 
@@ -77,9 +83,9 @@ class SimpleQ(Supervisor, gym.Env):
         self.keyboard.enable(self.__timestep)
 
         # Data I/O
-        self.io_pth = "data/statemaps.txt"
+        self.io_pth = "data/statemaps2.txt"
         with open(self.io_pth, mode='w') as f:
-            f.write('t, sid,x,y,rotz,rota,done,reward\n')
+            f.write('t,sid,x,y,rotz,rota,done,reward\n')
 
     def wait_keyboard(self):
         while self.keyboard.getKey() != ord('Y'):
@@ -89,7 +95,9 @@ class SimpleQ(Supervisor, gym.Env):
         id_list = self.recognize_objects()
         self.seq.step(id_list)
         self.HL.step(self.seq.X)
-        sid, _ = self.HL.infer_state(self.seq.X)
+        sid, Snodes = self.HL.infer_state(self.seq.X)
+        # vec = np.zeros(self.obs_dim)
+        # vec[:self.HL.N] = Snodes
         return sid
 
     def reset(self):
@@ -97,6 +105,9 @@ class SimpleQ(Supervisor, gym.Env):
         self.simulationResetPhysics()
         self.simulationReset()
         super().step(self.__timestep)
+
+        self.translation_field = self.supervis.getField('translation')
+        self.rotation_field = self.supervis.getField('rotation')
 
         # Reset position and velocity
         x = np.random.uniform(3.45, 6.3, size=1)
@@ -111,20 +122,19 @@ class SimpleQ(Supervisor, gym.Env):
             motor.setVelocity(0)
             motor.setPosition(float('inf'))
         # Reset hipposlam
-        self.seq.reset()
+        self.seq.reset_activity()
 
         # Infer the first step
         sid = self.get_obs()
 
         # IO
         with open(self.io_pth, 'a') as f:
-
-            f.write('%d,%d,%0.3f,%0.3f,%0.3f,%0.3f,%d,%d\n' % (self.getTime(), sid, x, y, -1, a, 0, 0))
+            f.write('%0.4f,%d,%0.3f,%0.3f,%0.3f,%0.3f,%d,%d\n' % (self.getTime(), sid, x, y, -1, a, 0, 0))
 
         # Internals
         super().step(self.__timestep)
 
-        # Open AI Gym generic
+
         return sid
 
     def step(self, action):
@@ -147,7 +157,8 @@ class SimpleQ(Supervisor, gym.Env):
         stuck_count = dpos < self.stuck_epsilon
         self.stuck_m = 0.9 * self.stuck_m + stuck_count * 1.0
         stuck = self.stuck_m > self.stuck_thresh
-        print('Interred state = %d/%d, dpos = %0.8f, %s, stuck_m = %0.4f' % (sid, self.HL.N, dpos, str(stuck_count), self.stuck_m))
+        print('\rInterred state = %d/%d, dpos = %0.8f, %s, stuck_m = %0.4f' % (sid, self.HL.N, dpos, str(stuck_count), self.stuck_m),
+              end='', flush=True)
         self.x, self.y = new_x, new_y
 
 
@@ -157,19 +168,26 @@ class SimpleQ(Supervisor, gym.Env):
         # Reward
         reward = 1 if done else 0
         if done:
-            print('Goal reached!')
+            print('\n================== Robot has reached the goal =================================\n')
 
-        if fallen or stuck:
-            msg = 'Fallen' if fallen else "Stuck"
-            print("\n================== Robot has %s ==============================================\n"%msg)
-            reward = -1
-            done = True
+        if fallen:
+            print('\n================== Robot has fallen %s=============================\n'%(str(fallen)))
+            print('Rotations = %0.4f, %0.4f, %0.4f, %0.4f '%(rotx, roty, rotz, rota))
+            print('Abs x and y = %0.4f, %0.4f'%(np.abs(rotx), (np.abs(roty))))
+            reward, done = -1, True
+            if self.fallen:
+                self.fallen_seq += 1
+            if self.fallen_seq > 5:
+                breakpoint()
 
-        # IO
+        if stuck:
+            print("\n================== Robot is stuck =================================\n")
+            reward, done = -1, True
+
+        self.fallen = fallen
 
         with open(self.io_pth, 'a') as f:
-            f.write('%d, %d,%0.3f,%0.3f,%0.3f,%0.3f,%d,%d\n'%(self.getTime(), sid, new_x, new_y, rotz, rota, int(done), reward))
-
+            f.write('%0.4f,%d,%0.3f,%0.3f,%0.3f,%0.3f,%d,%d\n'%(self.getTime(), sid, new_x, new_y, rotz, rota, int(done), reward))
 
 
         return sid, reward, done, {}
@@ -182,6 +200,8 @@ class SimpleQ(Supervisor, gym.Env):
         x, y, z = self._get_translation()
         closeIDlist = []
         farIDlist = []
+        closestID = None
+        closestdist = 100
         for objid in idlist:
 
             # Obtain object position
@@ -196,15 +216,20 @@ class SimpleQ(Supervisor, gym.Env):
 
             # Compute distance
             dist = np.sqrt((x - objpos[0]) ** 2 + (y - objpos[1])**2)
-            # print('Dist = %0.2f, obj_dist = %0.2f'%(dist, obj_dist))
+            if dist < closestdist:
+                closestdist = dist
+                closestID = objid
             if dist < self.obj_dist:
                 # print('Close object %d added'%(objid))
                 closeIDlist.append('%d'%(objid))
+
             else:
                 # print('Distant object %d added' % (objid))
                 farIDlist.append('%d'%objid)
 
         close_to_dist_list = []
+        if (len(closeIDlist) == 0) and (closestID is not None):
+            closeIDlist.append('%d'%(closestID))
         for c in closeIDlist:
             for d in farIDlist:
                 cd = c + "_" + d
@@ -220,7 +245,6 @@ class SimpleQ(Supervisor, gym.Env):
     def _set_translation(self, x, y, z):
         self.translation_field.setSFVec3f([x, y, z])
         return None
-
 
     def _set_rotation(self, rotx, roty, rotz, rot):
         self.rotation_field.setSFRotation([rotx, roty, rotz, rot])
