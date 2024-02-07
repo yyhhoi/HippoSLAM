@@ -9,8 +9,10 @@ class ActorModel(nn.Module):
         self.actor_model = torch.nn.Sequential(
             nn.Linear(self.obs_dim, self.hidden_dim),
             nn.ReLU(),
+            nn.Dropout(0.8),
             nn.Linear(self.hidden_dim, self.hidden_dim),
             nn.ReLU(),
+            nn.Dropout(0.8),
             nn.Linear(self.hidden_dim, self.act_dim),
             nn.Softmax(dim=1)
         )
@@ -28,8 +30,10 @@ class CriticModel(nn.Module):
         self.critic_model = torch.nn.Sequential(
             nn.Linear(self.obs_dim, self.hidden_dim),
             nn.ReLU(),
+            nn.Dropout(0.8),
             nn.Linear(self.hidden_dim, self.hidden_dim),
             nn.ReLU(),
+            nn.Dropout(0.8),
             nn.Linear(self.hidden_dim, self.act_dim),
         )
 

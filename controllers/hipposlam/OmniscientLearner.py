@@ -117,10 +117,8 @@ class OmniscientLearner(Supervisor, gym.Env):
         # Infer the first step
         obs = self.get_obs()
 
-
         # Internals
         super().step(self.__timestep)
-
 
         return obs
 
