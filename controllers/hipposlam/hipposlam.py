@@ -1,12 +1,14 @@
 """tabular_qlearning controller."""
 import os
 import numpy as np
-import gym
+import gymnasium as gym
 import torch
 from os.path import join
+
+from controllers.hipposlam.hipposlam.Replay import ReplayMemoryCat
 from hipposlam.sequences import Sequences, HippoLearner
-from hipposlam.Networks import ActorModel, CriticModel
-from hipposlam.ReinforcementLearning import TensorConvertor, DataLoader, model_train
+from hipposlam.Networks import ActorModel, MLP, QCriticModel
+from hipposlam.ReinforcementLearning import TensorConvertor, DataLoader, model_train, AWAC
 from controller import Keyboard, Supervisor
 # from stable_baselines3.common.env_checker import check_env
 # from stable_baselines3 import PPO
@@ -145,7 +147,7 @@ class OmniscientLearner(Supervisor, gym.Env):
 
 
         # Fallen detection
-        fallen = (np.abs(rotx) > 0.5) | (np.abs(roty) > 0.5)
+        fallen = (np.abs(rotx) > 0.4) | (np.abs(roty) > 0.4)
         if fallen:
             print('\n================== Robot has fallen %s=============================\n'%(str(fallen)))
             print('Rotations = %0.4f, %0.4f, %0.4f, %0.4f '%(rotx, roty, rotz, rota))
@@ -243,89 +245,72 @@ def main():
     save_dir = join('data', 'Omniscient')
     loss_recorder_pth = join(save_dir, 'AC_loss.txt')
     with open(loss_recorder_pth, 'w') as f:
-        f.write('critic_loss,actor_loss,t\n')
+        f.write('critic_loss,actor_loss,t,r\n')
 
     env = OmniscientLearner()
     obs_dim = 6
     act_dim = 3
-    gamma = 0.99
-    beta = 0.05
-    lamb = 1
-    TC = TensorConvertor(obs_dim, act_dim)
-    critic = CriticModel(obs_dim, act_dim)
-    delayed_critic = CriticModel(obs_dim, act_dim)
-    delayed_critic.load_state_dict(critic.state_dict())
-    actor = ActorModel(obs_dim, act_dim)
-    optimizer_A = torch.optim.Adam(actor.parameters(), lr=1e-4, weight_decay=1e-5)
-    optimizer_C = torch.optim.Adam(critic.parameters(), lr=1e-4, weight_decay=1e-5)
+    gamma = 0.9
+    lam = 1
+
+    critic = QCriticModel(obs_dim, act_dim)
+    critic_target = QCriticModel(obs_dim, act_dim)
+    actor = ActorModel(obs_dim, act_dim, logit=True)
+
+    batch_size = 128
+    memory = ReplayMemoryCat(max_size=10000)
+    datainds = np.cumsum([0, obs_dim, 1, obs_dim, 1, 1])
+    memory.specify_data_tuple(s=(datainds[0], datainds[1]), a=(datainds[1], datainds[2]),
+                              snext=(datainds[2], datainds[3]), r=(datainds[3], datainds[4]),
+                              end=(datainds[4], datainds[5]))
+    agent = AWAC(critic, critic_target, actor,
+                 lam=lam,
+                 gamma=gamma,
+                 num_action_samples=10,
+                 critic_lr=3e-4,
+                 actor_lr=3e-4,
+                 weight_decay=0,
+                 use_adv=True)
 
     Niters = 200
     maxtimeout = 300
 
-    DL = DataLoader(max_buffer_size=50, seed=0)
-
-
+    all_t = []
     for i in range(Niters):
         print('Episode %d/%d'%(i,Niters))
         s = env.reset()
-        s = torch.from_numpy(s).reshape(1, -1).to(torch.float32)
 
-        # ================== Model Unroll ===============================
-        print('Model Unrolling')
-        actor.eval()
-        critic.eval()
-        done = False
-        traj = []
+        truncated = False
         t = 0
-        while (done is False):
-            with torch.no_grad():
-                aprob = actor(s)  # (1, obs_dim) -> (1, act_dim)
-                a = TC.select_action_tensor(aprob)  # (1, act_dim) -> (1, ) int
-            s_next, r, done, _ = env.step(a.item())
+        while True and (truncated is False):
+
+            s = torch.from_numpy(s).to(torch.float32).view(-1, obs_dim)  # (1, obs_dim)
+            a = int(agent.get_action(s).squeeze())  # tensor (1, 1) -> int
+            snext, r, done, info = env.step(a)
+
+            experience = torch.concat([
+                s.squeeze(), torch.tensor([a]), torch.tensor(snext).to(torch.float),
+                torch.tensor([r]).to(torch.float), torch.tensor([done]).to(torch.float)
+            ])
+            memory.push(experience)
+            s = snext
             t += 1
-            if t > maxtimeout:
-                r, done = 0, True
-                print('TimeOut %d. Reset. Episode not added to the buffer.'%(maxtimeout))
-            a_onehot = np.zeros(act_dim)
-            a_onehot[a.item()] = 1
-            data_duple = (*s.squeeze().numpy(), *a_onehot, *s_next, r, done*1.0)
-            # print(np.around(data_duple, 3))
-            traj.append(data_duple)
-            s = torch.from_numpy(s_next).reshape(1, -1).to(torch.float32)
-        if (r != 0):
-            print("Episode added to the buffer. Time = %d"%(t))
-            data_to_append = np.vstack(traj)
-            DL.append(data_to_append)
+            if done:
+                all_t.append(t)
+                break
 
-        # ================== Model Train ===============================
-        print('Buffer has %d trajs'%(len(DL.buffer)))
-        if len(DL.buffer) < 1:
-            continue
-        actor.train()
-        critic.train()
-        all_closs, all_aloss =[], []
-        for s, a, s_next, r, end in DL.sample():
-            closs, aloss = model_train(s, a, s_next, r, end, actor, critic, delayed_critic, gamma, beta, lamb, False)
+        if len(memory) >= batch_size:
+            _s, _a, _snext, _r, _end = memory.sample(batch_size)
+            critic_loss = agent.update_critic(_s, _a, _snext, _r, _end)
+            actor_loss = agent.update_actor(_s, _a)
 
-            delayed_critic.load_state_dict(critic.state_dict())
+            closs = critic_loss.item()
+            aloss = actor_loss.item()
+            print('Training finished. C/A Loss = %0.6f, %0.6f' % (closs, aloss))
+            with open(loss_recorder_pth, 'a') as f:
+                f.write('%0.6f,%0.6f,%d,%0.1f\n' % (closs, aloss, t, r))
 
-            optimizer_C.zero_grad()
-            closs.backward()
-            optimizer_C.step()
-
-            optimizer_A.zero_grad()
-            aloss.backward()
-            optimizer_A.step()
-
-        clossmu = closs.item()
-        alossmu = aloss.item()
-        print('Training finished. C/A Loss = %0.6f, %0.6f'%(clossmu, alossmu))
-        with open(loss_recorder_pth, 'a') as f:
-            f.write('%0.6f,%0.6f,%d'%(clossmu, alossmu, t))
-
-    torch.save(critic.state_dict(), join(save_dir, 'critic.pickle'))
-    torch.save(delayed_critic.state_dict(), join(save_dir, 'delayed_critic.pickle'))
-    torch.save(actor.state_dict(), join(save_dir, 'actor.pickle'))
+    torch.save(agent.state_dict(), join(save_dir, 'AWAC.pickle'))
 
 if __name__ == '__main__':
     main()

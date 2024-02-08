@@ -217,6 +217,7 @@ class AWAC(nn.Module):
         """
 
         with torch.no_grad():
+            # breakpoint()
             qs = self.critic_target(next_states)  # (N, obs_dim) -> (N, act_dim)
             sampled_as = self.get_action(next_states, self.num_action_samples)  # (N, obs_dim) -> (N, N_action_samples)
             mean_qsa = qs.gather(1, sampled_as).mean(dim=-1, keepdims=True)  # (N, N_action_samples) -> (N, 1)

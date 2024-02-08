@@ -17,18 +17,17 @@ act_dim = 2
 
 gamma = 0.9
 lam = 1.0
-# critic = QCriticModel(obs_dim, act_dim)
-# critic_target = QCriticModel(obs_dim, act_dim)
-# actor = ActorModel(obs_dim, act_dim, logit=True)
+critic = QCriticModel(obs_dim, act_dim)
+critic_target = QCriticModel(obs_dim, act_dim)
+actor = ActorModel(obs_dim, act_dim, logit=True)
 
-critic = MLP(4, 2,
-           num_neurons=[128,128],
-           out_act='ReLU')
-critic_target = MLP(4, 2,
-                  num_neurons=[128,128],
-                  out_act='ReLU')
-actor = MLP(4, 2, num_neurons=[128,64])
-
+# critic = MLP(4, 2,
+#            num_neurons=[128,128],
+#            out_act='ReLU')
+# critic_target = MLP(4, 2,
+#                   num_neurons=[128,128],
+#                   out_act='ReLU')
+# actor = MLP(4, 2, num_neurons=[128,64])
 
 batch_size = 1024
 memory = ReplayMemoryCat(max_size=500000)
@@ -51,7 +50,6 @@ for n_epi in range(Niters):
     print('\rEpisode %d/%d'%(n_epi, Niters), flush=True, end='')
     s, _ = env.reset()
     cum_r = 0
-    traj = []
     truncated = False
     while True and (truncated is False):
 
