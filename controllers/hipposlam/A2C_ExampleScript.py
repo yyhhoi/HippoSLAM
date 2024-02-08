@@ -1,91 +1,121 @@
 # Paths
 from os.path import join
 
-import gym
+import gymnasium as gym
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
+
+from hipposlam.Replay import ReplayMemoryA2C
 from hipposlam.Networks import ActorModel, ValueCriticModel
-from hipposlam.ReinforcementLearning import TensorConvertor, model_train_A2C, \
-    compute_discounted_returns
+from hipposlam.ReinforcementLearning import compute_discounted_returns, A2C
 
+# Paths and parameters
 env = gym.make("CartPole-v1")
-
+offline = True
 obs_dim = 4
 act_dim = 2
-data_dim = obs_dim + act_dim + obs_dim + 2
 gamma = 0.99
-beta = 0.
-lamb = 1
-TC = TensorConvertor(obs_dim, act_dim)
+batch_size = 256
+max_buffer_size = 512
+
+if offline:
+    critic_lr = 3e-4
+    actor_lr = 3e-4
+    weight_decay = 1e-4
+    Niters = 1500
+else:
+    critic_lr = 1e-3
+    actor_lr = 1e-3
+    weight_decay = 1e-5
+    Niters = 500
+
+
+
+# Networks
 critic = ValueCriticModel(obs_dim)
-actor = ActorModel(obs_dim, act_dim)
-optimizer_C = torch.optim.Adam(critic.parameters(), lr=1e-3, weight_decay=1e-5)
-optimizer_A = torch.optim.Adam(actor.parameters(), lr=1e-3, weight_decay=1e-5)
+actor = ActorModel(obs_dim, act_dim, logit=True)
 
-Niters = 500
+# Replay Memory
+memory = ReplayMemoryA2C(max_size=max_buffer_size)
+datainds = np.cumsum([obs_dim, 1, 1])
+memory.specify_data_tuple(s=(0 , datainds[0]),
+                          a=(datainds[0], datainds[1]),
+                          G=(datainds[1], datainds[2]))
 
-dims = np.cumsum([0, obs_dim, act_dim, obs_dim, 1, 1])
+
+# AWAC wrapper
+agent = A2C(critic=critic,
+            actor=actor,
+            gamma=gamma,
+            critic_lr=critic_lr,
+            actor_lr=actor_lr,
+            weight_decay=weight_decay)
 rewards_alleps = []
+critic_losses, actor_losses = [], []
 maxtimesteps = 300
-for i in range(Niters):
-    print('Episode %d/%d' % (i, Niters))
-    s = env.reset()
-    s = torch.from_numpy(s).reshape(1, -1).to(torch.float32)
-
-    # ================== Model Unroll ===============================
-
-    done = False
-    alls = []
-    alla = []
-    allr = []
-    allend = []
-    total_reward = 0
-    actor.eval()
-    critic.eval()
+for n_epi in range(Niters):
+    print('\rEpisode %d/%d'%(n_epi, Niters), flush=True, end='')
+    s, _ = env.reset()
+    cum_r = 0
+    truncated = False
+    candidates = []
+    r_all, end_all = [], []
     t = 0
-    while (done is False) and (t < maxtimesteps):
-        with torch.no_grad():
-            aprob = actor(s)  # (1, obs_dim) -> (1, act_dim)
-            a = TC.select_action_tensor(aprob)  # (1, act_dim) -> (1, ) int
-            s_next, r, done, _ = env.step(a.item())
-        a_onehot = np.zeros(act_dim)
-        a_onehot[a.item()] = 1
-        alls.append(s.squeeze().numpy())
-        alla.append(a_onehot)
-        allr.append(r)
-        allend.append(done)
-        s = torch.from_numpy(s_next).reshape(1, -1).to(torch.float32)
-        total_reward += r
+    while True and (truncated is False) and (t < maxtimesteps):
+        s = torch.from_numpy(s).to(torch.float32).view(-1, obs_dim)  # (1, obs_dim)
+        a = int(agent.get_action(s).squeeze())  # tensor (1, 1) -> int
+        snext, r, done, truncated, info = env.step(a)
+        r_all.append(r)
+        end_all.append(done)
+
+        experience = torch.concat([
+            s.squeeze(), torch.tensor([a])
+        ])
+        candidates.append(experience)
+        s = snext
+        cum_r += 1
         t += 1
+        if done:
+            rewards_alleps.append(cum_r)
+            break
+
+    # Last v
     with torch.no_grad():
+        s = torch.from_numpy(s).to(torch.float32).view(-1, obs_dim)
         last_v = critic(s)
 
+    # Compute Returns
+    traj = torch.vstack(candidates)
+    G = compute_discounted_returns(r_all, end_all, last_v.squeeze().detach().item(), gamma)
+    traj = torch.hstack([traj, torch.from_numpy(G).to(torch.float32).view(-1, 1)])
 
-    rewards_alleps.append(total_reward)
-    alls = torch.from_numpy(np.vstack(alls)).to(torch.float32)
-    alla = torch.from_numpy(np.vstack(alla)).to(torch.float32)
-    allG = compute_discounted_returns(allr, allend, last_v.squeeze().detach().item(), gamma)
-    allG = torch.from_numpy(allG).to(torch.float32)
-    # ================== Model Train ===============================
-    actor.train()
-    critic.train()
-    all_closs, all_aloss = [], []
-    closs, aloss = model_train_A2C(alls, alla, allG, actor, critic)
+    if offline:
+        # Store memories
+        for exp in traj:
+            memory.push(exp)
 
-    optimizer_C.zero_grad()
-    closs.backward()
-    optimizer_C.step()
+        # Train
+        if len(memory) >= batch_size:
+            _s, _a, _G = memory.sample(batch_size)
+            critic_loss, actor_loss = agent.update_networks(_s, _a, _G)
+            critic_losses.append(critic_loss.item())
+            actor_losses.append(actor_loss.item())
+    else:
+        _s = traj[:, :obs_dim]
+        _a = traj[:, obs_dim:obs_dim+1].to(torch.int64)
+        _G = traj[:, -1:]
+        critic_loss, actor_loss = agent.update_networks(_s, _a, _G)
+        critic_losses.append(critic_loss.item())
+        actor_losses.append(actor_loss.item())
 
-    optimizer_A.zero_grad()
-    aloss.backward()
-    optimizer_A.step()
-
-    clossmu = closs.item()
-    alossmu = aloss.item()
-
-plt.scatter(np.arange(len(rewards_alleps)), rewards_alleps, s=2)
-plt.title("Total reward per episode (episodic)")
-plt.ylabel("reward")
-plt.xlabel("episode")
+fig, ax = plt.subplots(1, 3, figsize=(10, 3))
+ax[0].plot(rewards_alleps)
+ax[0].set_ylabel('Cum R')
+ax[1].plot(critic_losses)
+ax[1].set_ylabel('Critic loss')
+ax[2].plot(actor_losses)
+ax[2].set_ylabel('Actor loss')
+tag = 'offline' if offline else 'online'
+fig.savefig('A2C_%s.png'%tag, dpi=200)
 plt.show()
