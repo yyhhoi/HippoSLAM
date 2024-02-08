@@ -6,7 +6,7 @@ import torch
 from os.path import join
 
 from hipposlam.Replay import ReplayMemoryAWAC
-from hipposlam.utils import save_pickle
+from hipposlam.utils import save_pickle, read_pickle
 from hipposlam.sequences import Sequences, HippoLearner
 from hipposlam.Networks import ActorModel, MLP, QCriticModel
 from hipposlam.ReinforcementLearning import AWAC
@@ -17,7 +17,7 @@ from controller import Keyboard, Supervisor
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 class OmniscientLearner(Supervisor, gym.Env):
-    def __init__(self, max_episode_steps=1000, io_pth="data/statemaps.txt"):
+    def __init__(self, max_episode_steps=1000, io_pth="data/statemaps.txt", spawn='all', goal='hard'):
         super().__init__()
 
         # Open AI Gym generic
@@ -28,7 +28,8 @@ class OmniscientLearner(Supervisor, gym.Env):
         self.observation_space = gym.spaces.Box(lowBox, highBox, shape=(self.obs_dim,))
         self.state = None
         self.spec = gym.envs.registration.EnvSpec(id='WeBotsQ-v0', max_episode_steps=max_episode_steps)
-        self.game_mode = 'hard'  # 'easy' or 'hard'
+        self.spawn_mode = spawn  # 'all' or 'start'
+        self.goal_mode = goal  # 'easy' or 'hard'
 
         # Supervisor
         self.supervis = self.getSelf()
@@ -196,9 +197,9 @@ class OmniscientLearner(Supervisor, gym.Env):
         return None
 
     def _check_goal(self, x, y):
-        if self.game_mode == 'easy':
+        if self.goal_mode == 'easy':
             win = bool((x < 2) or (y < 0))
-        elif self.game_mode == 'hard':
+        elif self.goal_mode == 'hard':
             xgood = x < -4
             ygood = (y > -2) & (y < -0.5)
             win = bool(xgood and ygood)
@@ -207,11 +208,11 @@ class OmniscientLearner(Supervisor, gym.Env):
         return win
 
     def _spawn(self):
-        if self.game_mode == 'easy':
+        if self.spawn_mode == 'start':
             x = np.random.uniform(3.45, 6.3, size=1)
             y = np.random.uniform(1.35, 3.85, size=1)
             a = np.random.uniform(-np.pi, np.pi, size=1)
-        elif self.game_mode == 'hard':
+        elif self.spawn_mode == 'all':
             room = int(np.random.randint(0, 3))
             a = np.random.uniform(-np.pi, np.pi, size=1)
 
@@ -296,7 +297,6 @@ def learn_by_AWAC():
                 s.squeeze(), torch.tensor([a]), torch.tensor(snext).to(torch.float),
                 torch.tensor([r]).to(torch.float), torch.tensor([done]).to(torch.float)
             ])
-
             candidates.append(experience)
             s = snext
             t += 1
@@ -404,9 +404,12 @@ def naive_avoidance():
     save_pickle(join('data', 'Omniscient', 'naive_controller_data.pickle'), data)
 
 def evaluate_trained_model():
+    import pandas as pd
 
     # Paths
-    ckpt_pth = join('data', 'Omniscient', 'NaiveControllerCHPT.pt')
+    ckpt_name = 'FineTuneNavieControllerCHPT13'
+    load_ckpt_pth = join('data', 'Omniscient', '%s.pt'%(ckpt_name))
+    records_pth = join('data', 'Omniscient', '%s.csv'%(ckpt_name))
 
     # Parameters
     obs_dim = 6
@@ -426,13 +429,13 @@ def evaluate_trained_model():
                  actor_lr=5e-4,
                  weight_decay=0,
                  use_adv=True)
-    agent.load_checkpoint(ckpt_pth)
+    agent.load_checkpoint(load_ckpt_pth)
     agent.eval()
 
     # Unroll
-    env = OmniscientLearner()
+    env = OmniscientLearner(spawn='start', goal='hard')
     Niters = 100
-    all_t = []
+    records_dict = {'t':[], 'r':[]}
     maxtimeout = 300
     for i in range(Niters):
         print('Episode %d/%d'%(i, Niters))
@@ -448,12 +451,117 @@ def evaluate_trained_model():
             if done or (t >= maxtimeout):
                 msg = "Done" if done else "Timeout"
                 print(msg)
+                records_dict['t'].append(t)
+                records_dict['r'].append(r)
+                break
+
+    records_df = pd.DataFrame(records_dict)
+    records_df.to_csv(records_pth)
+
+def fine_tune_trained_model():
+    # Modes
+    load_expert_buffer = False
+    save_replay_buffer = True
+
+    # Paths
+    save_dir = join('data', 'Omniscient')
+    # load_ckpt_pth = join(save_dir, 'NaiveControllerCHPT.pt')
+    load_ckpt_pth = join(save_dir, 'FineTuneNavieControllerCHPT11.pt')
+    save_ckpt_pth = join(save_dir, 'FineTuneNavieControllerCHPT12.pt')
+    save_buffer_pth = join(save_dir, 'ReplayBuffer_FineTuneNavieControllerCHPT12.pt')
+    offline_data_pth = join(save_dir, 'naive_controller_data.pickle')
+
+    # Parameters
+    obs_dim = 6
+    act_dim = 3
+    gamma = 0.99
+    lam = 1
+    batch_size = 1024
+    max_buffer_size = 10000
+
+    # Initialize models
+    critic = MLP(obs_dim, act_dim, [128, 128])
+    critic_target = MLP(obs_dim, act_dim, [128, 128])
+    actor = MLP(obs_dim, act_dim, [128, 64])
+    agent = AWAC(critic, critic_target, actor,
+                 lam=lam,
+                 gamma=gamma,
+                 num_action_samples=10,
+                 critic_lr=5e-4,
+                 actor_lr=5e-4,
+                 weight_decay=0,
+                 use_adv=True)
+    agent.load_checkpoint(load_ckpt_pth)
+
+    # Initialize Replay buffer
+    memory = ReplayMemoryAWAC(max_size=max_buffer_size)
+    datainds = np.cumsum([0, obs_dim, 1, obs_dim, 1, 1])
+    memory.specify_data_tuple(s=(datainds[0], datainds[1]), a=(datainds[1], datainds[2]),
+                              snext=(datainds[2], datainds[3]), r=(datainds[3], datainds[4]),
+                              end=(datainds[4], datainds[5]))
+
+
+    # Load expert data and add to replay buffer
+    if load_expert_buffer:
+        data = read_pickle(offline_data_pth)
+        memory.from_offline_np(data['traj'])  # (time, data_dim=15)
+        print('Load Expert buffer. Replay buffer has %d samples' % (len(memory)))
+
+    # Unroll
+    env = OmniscientLearner(spawn='start', goal='hard')
+    Niters = 300
+    all_t = []
+    maxtimeout = 300
+    for i in range(Niters):
+        print('Episode %d/%d'%(i, Niters))
+        s = env.reset()
+        t = 0
+        agent.eval()
+        candidates = []
+        while True:
+
+            s = torch.from_numpy(s).to(torch.float32).view(-1, obs_dim)  # (1, obs_dim)
+            a = int(agent.get_action(s).squeeze())  # tensor (1, 1) -> int
+            snext, r, done, info = env.step(a)
+            experience = torch.concat([
+                s.squeeze(), torch.tensor([a]), torch.tensor(snext).to(torch.float),
+                torch.tensor([r]).to(torch.float), torch.tensor([done]).to(torch.float)
+            ])
+            candidates.append(experience)
+
+            s = snext
+            t += 1
+            if done or (t >= maxtimeout):
+                msg = "Done" if done else "Timeout"
+                print(msg)
                 all_t.append(t)
                 break
+
+        # Store memory
+        if t < maxtimeout:
+            for exp in candidates:
+                memory.push(exp)
+
+        # Training
+        agent.train()
+        if len(memory) > 1:
+            _s, _a, _snext, _r, _end = memory.sample(batch_size)
+            critic_loss = agent.update_critic(_s, _a, _snext, _r, _end)
+            actor_loss = agent.update_actor(_s, _a)
+            closs = critic_loss.item()
+            aloss = actor_loss.item()
+            print('Training finished. C/A Loss = %0.6f, %0.6f' % (closs, aloss))
+
+    agent.save_checkpoint(save_ckpt_pth)
+
+    if save_replay_buffer:
+        memory.save_buffer_torch(save_buffer_pth)
+
+
 def main():
     # naive_avoidance()
     evaluate_trained_model()
-
+    # fine_tune_trained_model()
 
 if __name__ == '__main__':
     main()

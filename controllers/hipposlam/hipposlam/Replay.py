@@ -47,6 +47,22 @@ class ReplayMemory:
             self.push(torch.from_numpy(traj).to(torch.float))
 
 
+    def save_buffer_torch(self, pth:str):
+        torch.save(torch.vstack(self.buffer), pth)
+
+    def load_buffer_torch(self, pth: str):
+        """
+
+        Parameters
+        ----------
+        pth : str
+            Path to the data containing (NumSamples, data_dim) torch tensor (float32)
+
+        """
+        alltrajs = torch.load(pth)
+        for traj in alltrajs :
+            self.push(traj)
+
 
 class ReplayMemoryAWAC(ReplayMemory):
     def __init__(self, max_size):

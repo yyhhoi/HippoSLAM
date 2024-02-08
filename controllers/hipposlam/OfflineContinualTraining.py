@@ -12,9 +12,10 @@ from hipposlam.utils import read_pickle
 
 # Paths
 save_dir = join('data', 'Omniscient')
-offline_data_pth = join(save_dir, 'naive_controller_data.pickle')
-save_chpt_pth = join(save_dir, 'NaiveControllerLayer3CHPT.pt')
-loss_records_pth = join(save_dir, 'NaiveControllerLayer3LOSS.png')
+load_ckpt_pth = join(save_dir, 'FineTuneNavieControllerCHPT12.pt')
+load_buffer_pth = join(save_dir, 'ReplayBuffer_FineTuneNavieControllerCHPT12.pt')
+save_ckpt_pth = join(save_dir, 'FineTuneNavieControllerCHPT13.pt')
+loss_records_pth = join(save_dir, 'Loss_FineTuneNavieControllerCHPT13.png')
 
 # Paramters
 obs_dim = 6
@@ -24,12 +25,12 @@ lam = 1
 use_adv = True
 batch_size = 1024
 max_buffer_size = 20000
-Niters = 50000
+Niters = 10000
 
 # Initialize Networks
-critic = MLP(obs_dim, act_dim, [128, 128, 128])
-critic_target = MLP(obs_dim, act_dim, [128, 128, 128])
-actor = MLP(obs_dim, act_dim, [128, 128, 64])
+critic = MLP(obs_dim, act_dim, [128, 128])
+critic_target = MLP(obs_dim, act_dim, [128, 128])
+actor = MLP(obs_dim, act_dim, [128, 64])
 
 
 # Initialize Replay buffer
@@ -38,21 +39,20 @@ datainds = np.cumsum([0, obs_dim, 1, obs_dim, 1, 1])
 memory.specify_data_tuple(s=(datainds[0], datainds[1]), a=(datainds[1], datainds[2]),
                           snext=(datainds[2], datainds[3]), r=(datainds[3], datainds[4]),
                           end=(datainds[4], datainds[5]))
+memory.load_buffer_torch(load_buffer_pth)
 
 # Initialize agent
 agent = AWAC(critic, critic_target, actor,
              lam=lam,
              gamma=gamma,
              num_action_samples=10,
-             critic_lr=2e-4,  # 5e-4
-             actor_lr=2e-4,  # 5e-4
-             weight_decay=5e-5,
+             critic_lr=5e-4,
+             actor_lr=5e-4,
+             weight_decay=0,
              use_adv=True)
 
-# Load offline data and add to replay buffer
-data = read_pickle(offline_data_pth)
-memory.from_offline_np(data['traj'])  # (time, data_dim=15)
-print('Replay buffer has %d samples'%(len(memory)))
+agent.load_checkpoint(load_ckpt_pth)
+
 
 # Training
 agent.train()
@@ -69,7 +69,7 @@ for i in range(Niters):
         print('Training %d/%d. C/A Loss = %0.6f, %0.6f' % (i, Niters, closs, aloss))
 
 # Save checkpoints
-agent.save_checkpoint(save_chpt_pth)
+agent.save_checkpoint(save_ckpt_pth)
 
 # Plot loss records
 fig, ax = plt.subplots(2, 1, figsize=(8, 6), sharex=True)
