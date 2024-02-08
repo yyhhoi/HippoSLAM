@@ -243,45 +243,6 @@ def key2action(key):
     else:
         return None
 
-def expert_demo():
-    # Paths
-    save_dir = join('data', 'Omniscient')
-    save_pth = join(save_dir, 'expert_demo.npy')
-    os.makedirs(save_dir, exist_ok=True)
-
-    # Initialize the environment
-    env = OmniscientLearner()
-    demo_data = []
-    NumTrajs = 3
-
-
-    obs = env.reset()
-    keyboard = Keyboard()
-    keyboard.enable(int(env.getBasicTimeStep()))
-
-    while len(demo_data) < NumTrajs:
-        print('Completing %d/%d demo' %(len(demo_data), NumTrajs))
-        traj = []
-        while env.steptime() != -1:
-            key = keyboard.getKey()
-            act = key2action(key)
-            if act is not None:
-                next_obs, reward, done, info = env.step(act)
-                data_tuple = (*obs, act, *next_obs, reward, done)
-                traj.append(data_tuple)
-                print(np.around(data_tuple, 2))
-                obs = next_obs
-                if done:
-                    obs = env.reset()
-                    print('Traj with %d steps added to demo data'%(len(traj)))
-                    break
-            else:
-                env.init_wheels()
-
-        demo_data.append(np.asarray(traj))
-    print('Demo finished, save data at %s'%(save_pth))
-    np.save(save_pth, np.vstack(demo_data))
-
 def learn_by_AWAC():
     # Paths
     save_dir = join('data', 'Omniscient')
@@ -384,8 +345,9 @@ def learn_by_AWAC():
     ax[3].plot(r_gau)
     fig.savefig(join(save_dir, 'AWAC.png'), dpi=300)
 
-def naive_avoidance():
 
+
+def naive_avoidance():
     def get_turn_direction(x, y):
         if x > 2:  # First room
             a = 2  # right
@@ -398,12 +360,8 @@ def naive_avoidance():
             a = 1  # left
         return a
 
-
     env = OmniscientLearner()
-
-    Niters = 200
-
-    data = {'traj':[], 'end_r':[]}
+    data = {'traj':[], 'end_r':[], 't':[]}
     cum_win = 0
     while cum_win <= 100:
         print('Iter %d, cum_win = %d'%(len(data['end_r']), cum_win))
@@ -411,6 +369,7 @@ def naive_avoidance():
         trajlist = []
         done = False
         r = None
+        t = 0
         while done is False:
 
             # Policy
@@ -432,20 +391,68 @@ def naive_avoidance():
             trajlist.append(experience)
 
             s = snext
+            t += 1
 
         # Store data
         traj = np.vstack(trajlist)
         data['traj'].append(traj)
         data['end_r'].append(r)
+        data['t'].append(t)
         if r > 0:
             cum_win += 1
 
-    save_pickle(join('data', 'Omniscient', 'expert.pickle'), data)
+    save_pickle(join('data', 'Omniscient', 'naive_controller_data.pickle'), data)
 
+def evaluate_trained_model():
 
+    # Paths
+    ckpt_pth = join('data', 'Omniscient', 'NaiveControllerCHPT.pt')
+
+    # Parameters
+    obs_dim = 6
+    act_dim = 3
+    gamma = 0.99
+    lam = 1
+
+    # Initialize models
+    critic = MLP(obs_dim, act_dim, [128, 128])
+    critic_target = MLP(obs_dim, act_dim, [128, 128])
+    actor = MLP(obs_dim, act_dim, [128, 64])
+    agent = AWAC(critic, critic_target, actor,
+                 lam=lam,
+                 gamma=gamma,
+                 num_action_samples=10,
+                 critic_lr=5e-4,
+                 actor_lr=5e-4,
+                 weight_decay=0,
+                 use_adv=True)
+    agent.load_checkpoint(ckpt_pth)
+    agent.eval()
+
+    # Unroll
+    env = OmniscientLearner()
+    Niters = 100
+    all_t = []
+    maxtimeout = 300
+    for i in range(Niters):
+        print('Episode %d/%d'%(i, Niters))
+        s = env.reset()
+        t = 0
+        while True:
+
+            s = torch.from_numpy(s).to(torch.float32).view(-1, obs_dim)  # (1, obs_dim)
+            a = int(agent.get_action(s).squeeze())  # tensor (1, 1) -> int
+            snext, r, done, info = env.step(a)
+            s = snext
+            t += 1
+            if done or (t >= maxtimeout):
+                msg = "Done" if done else "Timeout"
+                print(msg)
+                all_t.append(t)
+                break
 def main():
-    naive_avoidance()
-
+    # naive_avoidance()
+    evaluate_trained_model()
 
 
 if __name__ == '__main__':

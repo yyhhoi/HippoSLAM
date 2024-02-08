@@ -31,6 +31,22 @@ class ReplayMemory:
         self.index = 0
         self.size = 0
 
+    def from_offline_np(self, data):
+        """
+
+        Parameters
+        ----------
+        data : list or tuple
+            list of 2-d numpy arrays with shape (time, data_dim) recording the (s, a, s', r, end) of a whole episode.
+        Returns
+        -------
+
+        """
+        alltrajs = np.vstack(data)  # (time, data_dim=15)
+        for traj in alltrajs:
+            self.push(torch.from_numpy(traj).to(torch.float))
+
+
 
 class ReplayMemoryAWAC(ReplayMemory):
     def __init__(self, max_size):

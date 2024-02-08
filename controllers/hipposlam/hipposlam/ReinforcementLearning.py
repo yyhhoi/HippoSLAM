@@ -93,6 +93,7 @@ class AWAC(nn.Module):
 
         Returns
         -------
+        loss : torch.tensor (scalar)
 
         """
 
@@ -148,6 +149,36 @@ class AWAC(nn.Module):
         loss.backward()
         self.actor_opt.step()
         return loss
+
+    def save_checkpoint(self, pth):
+        ckpt_dict = {
+            'critic_state_dict': self.critic.state_dict(),
+            'critic_target_state_dict': self.critic_target.state_dict(),
+            'actor_state_dict': self.actor.state_dict(),
+            'critic_opt_state_dict': self.critic_opt.state_dict(),
+            'actor_opt_state_dict': self.actor_opt.state_dict(),
+            'lam': self.lam,
+            'tau': self.tau,
+            'gamma': self.gamma,
+            'num_action_samples': self.num_action_samples,
+            'use_adv': self.use_adv,
+        }
+        torch.save(ckpt_dict, pth)
+
+    def load_checkpoint(self, pth):
+        checkpoint = torch.load(pth)
+        self.critic.load_state_dict(checkpoint['critic_state_dict'])
+        self.critic_target.load_state_dict(checkpoint['critic_target_state_dict'])
+        self.actor.load_state_dict(checkpoint['actor_state_dict'])
+        self.critic_opt.load_state_dict(checkpoint['critic_opt_state_dict'])
+        self.actor_opt.load_state_dict(checkpoint['actor_opt_state_dict'])
+        self.lam = checkpoint['lam']
+        self.tau = checkpoint['tau']
+        self.gamma = checkpoint['gamma']
+        self.num_action_samples = checkpoint['num_action_samples']
+        self.use_adv = checkpoint['use_adv']
+
+
 
 
 class DQN(nn.Module):
