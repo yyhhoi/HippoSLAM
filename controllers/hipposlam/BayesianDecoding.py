@@ -1,6 +1,6 @@
 import numpy as np
 from hipposlam.utils import read_pickle
-from hipposlam.sequences import Sequences
+from hipposlam.Sequences import Sequences
 from hipposlam.comput_utils import circular_gau_filter, divide_ignore, midedges, Arena
 import pandas as pd
 import matplotlib.pyplot as plt

@@ -5,7 +5,7 @@ Note: different distance = different sequence instance
 import sys
 from os.path import join
 import os
-from hipposlam.sequences import Sequences
+from hipposlam.Sequences import Sequences
 from hipposlam.utils import save_pickle
 from controller import Supervisor
 from hipposlam.vision import SiftMemory

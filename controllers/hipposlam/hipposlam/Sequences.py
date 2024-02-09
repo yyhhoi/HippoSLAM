@@ -8,8 +8,8 @@ class Sequences:
         self.L = L
         self.X_Ncol = R + L - 1
         self.X = np.zeros((0, self.X_Ncol))
-        self.stored_f = dict()  # mapped to the row id of X
-        self.f_sigma = dict()
+        self.stored_f = dict()  # mapped to the row id of X. ObjectID (str/int) to RowID of X (int)
+        self.f_sigma = dict()  # ObjectID (str/int) to sigma (int)
         self.current_f = []
         self.num_f = 0
         self.iter = 0
@@ -107,13 +107,84 @@ class MatrixJ:
         assert (X.shape[1] == self.mat.shape[2])  # same K
         self.mat[target_n, :, :] = self.mat[target_n, :, :] + X
 
-    def normalize(self):
+    def normalize(self, area=False):
         N, F, K = self.mat.shape
         assert N > 0
         assert F > 0
-        areas = np.sqrt(np.sum(np.sum(self.mat ** 2, axis=1), axis=1))
-        # areas = np.sum(np.sum(self.mat, axis=1), axis=1)
-        self.mat = self.mat / areas.reshape(areas.shape[0], 1, 1)
+        if area:
+            norm = np.sum(np.sum(self.mat, axis=1), axis=1)
+        else:
+            norm = np.sqrt(np.sum(np.sum(self.mat ** 2, axis=1), axis=1))
+        self.mat = self.mat / norm.reshape(norm.shape[0], 1, 1)
+
+
+class StateDecoder:
+    def __init__(self, R, L):
+        self.R = R
+        self.K = R + L - 1  # Number of columns of decoder matrix J
+        self.N = 0  # Number of state nodes
+        self.current_F = 0
+        self.current_Sid = 0  # Current ID of the state node
+        self.current_Sval = 1
+        self.J = MatrixJ(self.N, self.current_F,
+                         self.K)  # MatrixJ mapping J.reshape(N, -1) @ X.flatten() = State vector
+
+    def step(self, X):
+        """
+
+        Parameters
+        ----------
+        X : ndarray
+            2-d array with shape (F, K). F = Number of feature nodes. K = R + L - 1.
+
+        Returns
+        -------
+
+        """
+        newF = X.shape[0]
+
+        # Conditions trigger creating a new experience node
+        N_tag = self.N < 1
+        F_tag = newF > self.current_F
+        S_tag = self.current_Sval < 0.26
+        if N_tag:
+            X_tag = True
+        else:
+            PreviousQuietFids = np.where(self.J.mat[self.current_Sid, :, :].sum(axis=1) < 1e-6)[0]
+            X_tag = np.any(X[PreviousQuietFids, :] > 0)
+
+        if N_tag or F_tag or (S_tag and X_tag):
+            # Create a new state node
+            self.N = self.J.expand_N(1)
+
+            # Extend self.J.mat to the shape of X
+            if F_tag:
+                dF = newF - self.J.mat.shape[1]
+                self.current_F = self.J.expand_F(dF)
+
+            # Associate X with the  N-th node
+            X_norm = X / X.sum()
+            self.J.increment(X_norm, self.N - 1)
+
+    def infer_state(self, X):
+
+        if self.N == 0:
+            self.current_Sid = 0
+            Snodes = np.ones(1)
+
+        elif X.sum() < 1e-6:
+            # if No feature nodes were observed, use the previous state as inferred result
+            Snodes = np.zeros(self.N)
+            Snodes[self.current_Sid] = 1
+            self.current_Sval = 1
+
+        else:
+            Snodes = self.J.mat.reshape(self.N, self.current_F * self.K) @ X.flatten()
+            self.current_Sid = np.argmax(Snodes)
+            self.current_Sval = np.max(Snodes)
+
+        return self.current_Sid, Snodes
+
 
 
 class HippoLearner:

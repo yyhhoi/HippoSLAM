@@ -64,50 +64,51 @@ class ReplayMemory:
             self.push(traj)
 
 
+
 class ReplayMemoryAWAC(ReplayMemory):
     def __init__(self, max_size):
         super().__init__(max_size)
-        self.indexes = None
+        self.sliceinds = None
 
     def sample(self, batch_size):
-        assert self.indexes is not None
+        assert self.sliceinds is not None
         if self.size <= batch_size:
             indices = [ind for ind in range(self.size)]
         else:
             indices = sample(range(self.size), batch_size)
         data = torch.vstack([self.buffer[index] for index in indices])
-        s = data[:, self.indexes[0][0]:self.indexes[0][1]]  # (Nsamp, obs_dim)
-        a = data[:, self.indexes[1][0]:self.indexes[1][1]].to(torch.int64)  # (Nsamp, act_dim)
-        snext = data[:, self.indexes[2][0]:self.indexes[2][1]]  # (Nsamp, obs_dim)
-        r = data[:, self.indexes[3][0]:self.indexes[3][1]]  # (Nsamp, 1)
-        end = data[:, self.indexes[4][0]:self.indexes[4][1]]  # (Nsamp, 1)
+        s = data[:, self.sliceinds[0][0]:self.sliceinds[0][1]]  # (Nsamp, obs_dim)
+        a = data[:, self.sliceinds[1][0]:self.sliceinds[1][1]].to(torch.int64)  # (Nsamp, act_dim)
+        snext = data[:, self.sliceinds[2][0]:self.sliceinds[2][1]]  # (Nsamp, obs_dim)
+        r = data[:, self.sliceinds[3][0]:self.sliceinds[3][1]]  # (Nsamp, 1)
+        end = data[:, self.sliceinds[4][0]:self.sliceinds[4][1]]  # (Nsamp, 1)
         data_tuple = (s, a, snext, r, end)
         return data_tuple
 
     def specify_data_tuple(self, s: Tuple[int, int], a: Tuple[int, int], snext: Tuple[int, int], r: Tuple[int, int],
                            end: Tuple[int, int]):
-        self.indexes = (s, a, snext, r, end)
+        self.sliceinds = (s, a, snext, r, end)
         return None
 
 
 class ReplayMemoryA2C(ReplayMemory):
     def __init__(self, max_size):
         super().__init__(max_size)
-        self.indexes = None
+        self.sliceinds = None
 
     def sample(self, batch_size):
-        assert self.indexes is not None
+        assert self.sliceinds is not None
         if self.size <= batch_size:
             indices = [ind for ind in range(self.size)]
         else:
             indices = sample(range(self.size), batch_size)
         data = torch.vstack([self.buffer[index] for index in indices])
-        s = data[:, self.indexes[0][0]:self.indexes[0][1]]  # (Nsamp, obs_dim)
-        a = data[:, self.indexes[1][0]:self.indexes[1][1]].to(torch.int64)  # (Nsamp, 1)
-        G = data[:, self.indexes[2][0]:self.indexes[2][1]]  # (Nsamp, 1)
+        s = data[:, self.sliceinds[0][0]:self.sliceinds[0][1]]  # (Nsamp, obs_dim)
+        a = data[:, self.sliceinds[1][0]:self.sliceinds[1][1]].to(torch.int64)  # (Nsamp, 1)
+        G = data[:, self.sliceinds[2][0]:self.sliceinds[2][1]]  # (Nsamp, 1)
         data_tuple = (s, a, G)
         return data_tuple
 
     def specify_data_tuple(self, s: Tuple[int, int], a: Tuple[int, int], G: Tuple[int, int]):
-        self.indexes = (s, a, G)
+        self.sliceinds = (s, a, G)
         return None
