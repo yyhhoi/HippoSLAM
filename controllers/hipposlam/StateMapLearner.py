@@ -9,20 +9,31 @@ import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 def naive_avoidance():
+    # Tags
+    load_previous_hipposlam = False
+
     # Paths
-    save_dir = join('data', 'StateMapLearner')
+    project_name = 'StateMapLearner'
+    save_dir = join('data', project_name)
     os.makedirs(save_dir, exist_ok=True)
-    save_hipposeq_pth = join(save_dir, 'HippoSLAMseq.pickle')
-    save_hippomap_pth = join(save_dir, 'HippoSLAMmap.pickle')
+    save_replay_pth = join(save_dir, 'AvoidanceReplayBuffer.pickle')
+    load_hipposlam_pth = join(save_dir, 'hipposlam.pickle')
+    save_hipposlam_pth = join(save_dir, 'hipposlam.pickle')
+
 
 
 
     env = StateMapLearner(spawn='start')
-    data = {'traj':[], 'end_r':[], 't':[]}
+    if load_previous_hipposlam:
+        env.load_hipposlam(load_hipposlam_pth)
+        breakpoint()
+    data = {'episodes':[], 'end_r':[], 't':[], 'traj':[]}
+
     cum_win = 0
-    while cum_win <= 5:
+    while cum_win <= 50:
         print('Iter %d, cum_win = %d'%(len(data['end_r']), cum_win))
         s = env.reset()
+        explist = []
         trajlist = []
         done = False
         r = None
@@ -30,28 +41,30 @@ def naive_avoidance():
         while done is False:
 
             # Policy
-            x, y, z = env._get_translation()
+            x, y = env.x, env.y
+            rotz, rota = env.rotz, env.rota
             a = breakroom_avoidance_policy(x, y, env.ds.getValue(), 0.3)
 
             # Step
             snext, r, done, info = env.step(a)
 
             # Store data
-            trajlist.append(np.array([s, a, snext, r, done]))
+            explist.append(np.array([s, a, snext, r, done]))
+            trajlist.append(np.array([x, y, np.sign(rotz)*rota, s]))
 
             s = snext
             t += 1
 
         # Store data
-        traj = np.vstack(trajlist)
-        data['traj'].append(traj)
+        data['episodes'].append(np.vstack(explist))
+        data['traj'].append(np.vstack(trajlist))
         data['end_r'].append(r)
         data['t'].append(t)
         if r > 0:
             cum_win += 1
-
-    save_pickle(save_hipposeq_pth, env.hipposeq)
-    save_pickle(save_hippomap_pth, env.hippomap)
+        print()
+    env.save_hipposlam(save_hipposlam_pth)
+    save_pickle(save_replay_pth, data)
 
 
 

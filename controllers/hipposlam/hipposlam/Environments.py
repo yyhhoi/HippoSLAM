@@ -5,7 +5,8 @@ import numpy as np
 from controller import Supervisor
 import gymnasium as gym
 
-from .Sequences import Sequences, HippoLearner
+from .Sequences import Sequences, HippoLearner, StateDecoder
+from .utils import save_pickle, read_pickle
 
 
 class BreakRoom(Supervisor, gym.Env):
@@ -148,6 +149,7 @@ class BreakRoom(Supervisor, gym.Env):
             if self.fallen:
                 self.fallen_seq += 1
             if self.fallen_seq > 5:
+                self.fallen_seq = 0
                 breakpoint()
         self.fallen = fallen
 
@@ -206,7 +208,7 @@ class BreakRoom(Supervisor, gym.Env):
 
         else:
             raise ValueError()
-        return x, y, a
+        return float(x), float(y), float(a)
 
 
 class OmniscientLearner(BreakRoom):
@@ -235,22 +237,32 @@ class StateMapLearner(BreakRoom):
         self.obj_dist = 2  # in meters
         R, L = 5, 10
         self.hipposeq = Sequences(R=R, L=L, reobserve=False)
-        self.hippomap = HippoLearner(R, L, L)
-        self.pp = PrettyPrinter()
+        self.hippomap = StateDecoder(R, L)
 
 
     def get_obs(self):
         id_list = self.recognize_objects()
+        # print('Object ID list\n', id_list)
         self.hipposeq.step(id_list)
-        self.hippomap.step(self.hipposeq.X)
+        # print('X matrix:\n', self.hipposeq.X)
         sid, Snodes = self.hippomap.infer_state(self.hipposeq.X)
+        # if self.hippomap.N > 0:
+        #     print('J Matrix before, at state %d\n'%(self.hippomap.current_Sid+1), np.around(self.hippomap.J.mat[self.hippomap.current_Sid, ], 4))
+        self.hippomap.step(self.hipposeq.X)
 
+        # if self.hippomap.N > 0:
+        #     print('J Matrix after, at state %d\n' % (self.hippomap.current_Sid + 1), np.around(self.hippomap.J.mat[self.hippomap.current_Sid, ], 4))
+        print('Interred state = %d   / %d  , val = %0.2f, second = %0.2f'%(sid+1, self.hippomap.N, Snodes[sid], self.hippomap.second_Sval))
+        #
+        # print('Activations\n',  (np.around(Snodes, 2)))
+        # print('\n'*2)
         return sid
 
     def reset(self):
         obs = super(StateMapLearner, self).reset()
         # Reset hipposlam
         self.hipposeq.reset_activity()
+        self.hippomap.reset()
         return obs
 
 
@@ -261,9 +273,6 @@ class StateMapLearner(BreakRoom):
         # Distance from robot to the objects
         x, y, z = self._get_translation()
         closeIDlist = []
-        farIDlist = []
-        closestID = None
-        closestdist = 100
         for objid in idlist:
 
             # Obtain object position
@@ -274,26 +283,21 @@ class StateMapLearner(BreakRoom):
             if str(objid) not in self.fpos_dict:
                 fpos_key = '%d'%objid
                 self.fpos_dict[fpos_key] = objpos
-                print('Insert Id=%s with position ' % (fpos_key), objpos)
+                # print('Insert Id=%s with position ' % (fpos_key), objpos)
 
             # Compute distance
             dist = np.sqrt((x - objpos[0]) ** 2 + (y - objpos[1])**2)
-            if dist < closestdist:
-                closestdist = dist
-                closestID = objid
+
             if dist < self.obj_dist:
                 # print('Close object %d added'%(objid))
                 closeIDlist.append('%d'%(objid))
 
-            else:
-                # print('Distant object %d added' % (objid))
-                farIDlist.append('%d'%objid)
+        return closeIDlist
 
-        close_to_dist_list = []
-        if (len(closeIDlist) == 0) and (closestID is not None):
-            closeIDlist.append('%d'%(closestID))
-        for c in closeIDlist:
-            for d in farIDlist:
-                cd = c + "_" + d
-                close_to_dist_list.append(cd)
-        return close_to_dist_list
+    def save_hipposlam(self, pth):
+        save_pickle(pth, dict(hipposeq=self.hipposeq, hippomap=self.hippomap))
+
+    def load_hipposlam(self, pth):
+        hippodata = read_pickle(pth)
+        self.hippomap = hippodata['hippomap']
+        self.hipposeq = hippodata['hipposeq']

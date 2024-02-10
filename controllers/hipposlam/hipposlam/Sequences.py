@@ -125,10 +125,12 @@ class StateDecoder:
         self.N = 0  # Number of state nodes
         self.current_F = 0
         self.current_Sid = 0  # Current ID of the state node
-        self.current_Sval = 1
+        self.current_Sval = 0
+        self.second_Sval = 0
+        self.lowSThresh = 0.21
         self.J = MatrixJ(self.N, self.current_F,
                          self.K)  # MatrixJ mapping J.reshape(N, -1) @ X.flatten() = State vector
-
+        self.sid_special = []
     def step(self, X):
         """
 
@@ -142,48 +144,79 @@ class StateDecoder:
 
         """
         newF = X.shape[0]
-
+        # Sdiff = self.current_Sval - self.second_Sval
         # Conditions trigger creating a new experience node
         N_tag = self.N < 1
-        F_tag = newF > self.current_F
-        S_tag = self.current_Sval < 0.26
+        # F_tag = newF > self.current_F
+        S_tag = self.current_Sval <= self.lowSThresh
+
+        Xarea = np.sum(X)
+        # minX_tag = Xarea > 0.1
         if N_tag:
             X_tag = True
         else:
-            PreviousQuietFids = np.where(self.J.mat[self.current_Sid, :, :].sum(axis=1) < 1e-6)[0]
-            X_tag = np.any(X[PreviousQuietFids, :] > 0)
+            PreviousQuietMask = self.J.mat[self.current_Sid, :, :].sum(axis=1) < 1e-6
+            PreviousQuietIDs = np.where(PreviousQuietMask)[0]
+            # print('Previous Quiet X row ids = \n', PreviousQuietIDs)
+            X_tag = np.any(X[PreviousQuietIDs, :] > 0)
 
-        if N_tag or F_tag or (S_tag and X_tag):
+        if N_tag or (S_tag and X_tag):
+            # print('Learning: N_tag = %s, F_tag = %s, S_tag = %s, X_tag = %s'%(str(N_tag), str(F_tag), str(S_tag), str(X_tag)))
             # Create a new state node
             self.N = self.J.expand_N(1)
 
-            # Extend self.J.mat to the shape of X
-            if F_tag:
-                dF = newF - self.J.mat.shape[1]
-                self.current_F = self.J.expand_F(dF)
 
             # Associate X with the  N-th node
-            X_norm = X / X.sum()
+            X_norm = X / Xarea
             self.J.increment(X_norm, self.N - 1)
+
+            # Store data
+            if (S_tag and X_tag):
+                print('Learning due to new patterns')
+                self.sid_special.append(self.N-1)
 
     def infer_state(self, X):
 
+
+        # Extend self.J.mat to the shape of X
+        newF = X.shape[0]
+        F_tag = newF > self.current_F
+        if F_tag:
+            dF = newF - self.J.mat.shape[1]
+            self.current_F = self.J.expand_F(dF)
+
         if self.N == 0:
             self.current_Sid = 0
-            Snodes = np.ones(1)
+            Snodes = np.zeros(1)
 
         elif X.sum() < 1e-6:
+            print('Inference: X is zero')
             # if No feature nodes were observed, use the previous state as inferred result
             Snodes = np.zeros(self.N)
-            Snodes[self.current_Sid] = 1
-            self.current_Sval = 1
+            Snodes[self.current_Sid] = 0
+            self.current_Sval = 0
 
         else:
             Snodes = self.J.mat.reshape(self.N, self.current_F * self.K) @ X.flatten()
-            self.current_Sid = np.argmax(Snodes)
-            self.current_Sval = np.max(Snodes)
+            if np.sum(Snodes) < 1e-6:
+                print('Inference: all Snodes are zeros')
+                self.current_Sval = 0
+            else:
+                self.current_Sid = np.argmax(Snodes)
+                self.current_Sval = np.max(Snodes)
 
+        if self.N > 1:
+            idsorted = np.argsort(Snodes)
+            secondmaxid = idsorted[-2]
+            self.second_Sval = Snodes[secondmaxid]
+        else:
+            self.second_Sval = 0
         return self.current_Sid, Snodes
+
+    def reset(self):
+        self.current_Sid = 0  # Current ID of the state node
+        self.current_Sval = 0
+        self.second_Sval = 0
 
 
 

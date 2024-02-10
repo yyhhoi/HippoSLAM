@@ -33,8 +33,8 @@ WorldInfo {
   title "Break Room"
 }
 Viewpoint {
-  orientation 0.5729250977969449 -0.5677501754236347 -0.5911146848292579 4.2013769600067565
-  position 1.0789142797128406 0.09504428403198295 24.954961658362414
+  orientation 0.5340120830377081 -0.5419079416862441 -0.6489737112604071 4.30633900359073
+  position 1.406752164421515 -4.107820532135957 26.209427657974782
 }
 TexturedBackground {
   texture "entrance_hall"
@@ -58,7 +58,7 @@ Floor {
 }
 Wall {
   translation -2.65 -0.36 0
-  size 0.05 5 1.6
+  size 0.05 5 2.5
   appearance DEF SMALL_WALLS Roughcast {
     colorOverride 0.890196 0.803922 1
     textureTransform TextureTransform {
@@ -69,7 +69,7 @@ Wall {
 Wall {
   translation 1.93 1.76 0
   name "wall(1)"
-  size 0.05 6 1.6
+  size 0.05 6 2.5
   appearance USE SMALL_WALLS
 }
 Wall {
@@ -1098,8 +1098,8 @@ DEF AGENT Robot {
         }
       ]
       endPoint DEF WHEEL4 Solid {
-        translation -0.09999999999999963 -0.10999999999999943 -0.01999999999999934
-        rotation 1 8.737548485203472e-14 -6.633628454624379e-14 1.5707999999960247
+        translation -0.09999999999999962 -0.10999999999999943 -0.019999999999999178
+        rotation 1 8.839604307582481e-14 -6.523722184370375e-14 1.5707999999959843
         children [
           DEF WHEEL Shape {
             appearance PBRAppearance {
@@ -1131,8 +1131,8 @@ DEF AGENT Robot {
         }
       ]
       endPoint DEF WHEEL3 Solid {
-        translation -0.10000000000000012 0.11000000000000032 -0.019999999999999584
-        rotation 1 3.703252523972494e-13 -3.2500854203712175e-14 1.5707999999966171
+        translation -0.10000000000000012 0.11000000000000032 -0.01999999999999954
+        rotation 1 3.706981486713308e-13 -3.579804231133562e-14 1.57079999999659
         children [
           DEF WHEEL Shape {
             appearance PBRAppearance {
@@ -1164,8 +1164,8 @@ DEF AGENT Robot {
         }
       ]
       endPoint DEF WHEEL2 Solid {
-        translation 0.10000000000000005 -0.10999999999999943 -0.020000000000000094
-        rotation 1 2.2766298838350212e-14 -7.245963388895603e-14 1.57079999999652
+        translation 0.10000000000000005 -0.10999999999999943 -0.02000000000000013
+        rotation 1 2.3394334668373974e-14 -7.20671114951923e-14 1.5707999999964932
         children [
           DEF WHEEL Shape {
             appearance PBRAppearance {
@@ -1197,8 +1197,8 @@ DEF AGENT Robot {
         }
       ]
       endPoint DEF WHEEL1 Solid {
-        translation 0.09999999999999959 0.11000000000000032 -0.01999999999999969
-        rotation 1 4.364554626868976e-13 -7.830821755607263e-15 1.5707999999959277
+        translation 0.0999999999999996 0.11000000000000032 -0.019999999999999685
+        rotation 1 4.3491481229137894e-13 -6.672880694001302e-15 1.5707999999958895
         children [
           DEF WHEEL Shape {
             appearance PBRAppearance {
