@@ -239,4 +239,61 @@ class DQN(nn.Module):
         loss.backward()
         self.opt.step()
 
+class BioQ:
+
+    def __init__(self, N=100, act_dim=3, lr=0.025, beta=5, gamma=0.9):
+
+        self.N = N
+        self.act_dim = act_dim
+        self.lr = lr
+        self.beta = beta
+        self.gamma = gamma
+
+        self.m = np.ones((self.N, self.act_dim))
+        # self.m = np.random.uniform(-0.1, 0.1, size=(self.N, self.act_dim))
+        self.m = self.m / np.linalg.norm(self.m, axis=1, keepdims=True)
+        self.l = np.zeros(self.N)
+        self.w = np.zeros(self.N)
+
+        self.iter = 1
+        self.counts = np.ones((self.N, self.act_dim))
+
+    def get_action(self, state:int):
+        # ucb = np.sqrt(np.log(self.iter)/self.counts[state, :])
+        # print('Counts = ', list(np.around(self.counts[state, :], 3)))
+        expo = self.beta * self.m[state, :]
+        aprob = self._softmax(expo)
+        a = int(np.random.choice(np.arange(self.act_dim), p=aprob))
+        self.iter += 1
+        self.counts[state, a] += 1
+        return a, aprob
+
+    def expand(self, state):
+        if state > self.N-1:
+            dnum = state+1 - self.N
+            self.l = np.concatenate([self.l, np.zeros(dnum)])
+            self.w = np.concatenate([self.w, np.zeros(dnum)])
+            # self.m = np.vstack([self.m, np.random.uniform(-0.1, 0.1, size=(dnum, self.act_dim))])
+            self.m = np.vstack([self.m, np.ones((dnum, self.act_dim))])
+            self.counts = np.vstack([self.counts, np.ones(-1, 1, size=(dnum, self.act_dim))])
+    def update(self, state, action, action_prob, reward, next_state, done):
+        self.l[state] = self.l[state] * self.gamma
+        self.l[state] = self.l[state] + 1
+
+        # if done:
+        #     td = reward - self.w[state]
+        # else:
+        td = self.w[next_state] + reward - self.w[state]
+
+        self.w = self.w + self.lr * td * self.l
+
+        avec = np.zeros(self.act_dim)
+        avec[action] = 1
+        self.m[state, :] = self.m[state, :] + self.lr * td * (avec - action_prob)
+        self.m[state, :] = self.m[state, :]/np.linalg.norm(self.m[state, :])
+
+    def _softmax(self, m):
+        aprob = np.exp(m) / np.sum(np.exp(m))
+        return aprob
+
 

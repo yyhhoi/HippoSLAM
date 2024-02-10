@@ -7,7 +7,7 @@ from os.path import join
 
 from hipposlam.Replay import ReplayMemoryAWAC
 from hipposlam.utils import save_pickle, read_pickle, breakroom_avoidance_policy
-from hipposlam.Sequences import Sequences, HippoLearner
+from hipposlam.Sequences import Sequences
 from hipposlam.Networks import ActorModel, MLP, QCriticModel
 from hipposlam.ReinforcementLearning import AWAC
 from controller import Keyboard, Supervisor

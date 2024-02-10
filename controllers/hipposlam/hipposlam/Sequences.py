@@ -123,6 +123,8 @@ class StateDecoder:
         self.R = R
         self.K = R + L - 1  # Number of columns of decoder matrix J
         self.N = 0  # Number of state nodes
+        self.maxN = 500  # When N reaches the maximum, no new node will be expanded.
+        self.learn_mode = True  # Whether expanding new state is allowed.
         self.current_F = 0
         self.current_Sid = 0  # Current ID of the state node
         self.current_Sval = 0
@@ -131,7 +133,7 @@ class StateDecoder:
         self.J = MatrixJ(self.N, self.current_F,
                          self.K)  # MatrixJ mapping J.reshape(N, -1) @ X.flatten() = State vector
         self.sid_special = []
-    def step(self, X):
+    def learn(self, X):
         """
 
         Parameters
@@ -143,41 +145,31 @@ class StateDecoder:
         -------
 
         """
-        newF = X.shape[0]
-        # Sdiff = self.current_Sval - self.second_Sval
+
         # Conditions trigger creating a new experience node
         N_tag = self.N < 1
-        # F_tag = newF > self.current_F
         S_tag = self.current_Sval <= self.lowSThresh
 
         Xarea = np.sum(X)
-        # minX_tag = Xarea > 0.1
         if N_tag:
             X_tag = True
         else:
             PreviousQuietMask = self.J.mat[self.current_Sid, :, :].sum(axis=1) < 1e-6
             PreviousQuietIDs = np.where(PreviousQuietMask)[0]
-            # print('Previous Quiet X row ids = \n', PreviousQuietIDs)
             X_tag = np.any(X[PreviousQuietIDs, :] > 0)
 
         if N_tag or (S_tag and X_tag):
-            # print('Learning: N_tag = %s, F_tag = %s, S_tag = %s, X_tag = %s'%(str(N_tag), str(F_tag), str(S_tag), str(X_tag)))
             # Create a new state node
             self.N = self.J.expand_N(1)
-
-
             # Associate X with the  N-th node
             X_norm = X / Xarea
             self.J.increment(X_norm, self.N - 1)
 
             # Store data
             if (S_tag and X_tag):
-                print('Learning due to new patterns')
                 self.sid_special.append(self.N-1)
 
     def infer_state(self, X):
-
-
         # Extend self.J.mat to the shape of X
         newF = X.shape[0]
         F_tag = newF > self.current_F
@@ -190,7 +182,7 @@ class StateDecoder:
             Snodes = np.zeros(1)
 
         elif X.sum() < 1e-6:
-            print('Inference: X is zero')
+            # print('Inference: X is zero')
             # if No feature nodes were observed, use the previous state as inferred result
             Snodes = np.zeros(self.N)
             Snodes[self.current_Sid] = 0
@@ -199,108 +191,19 @@ class StateDecoder:
         else:
             Snodes = self.J.mat.reshape(self.N, self.current_F * self.K) @ X.flatten()
             if np.sum(Snodes) < 1e-6:
-                print('Inference: all Snodes are zeros')
+                # print('Inference: all Snodes are zeros')
                 self.current_Sval = 0
             else:
                 self.current_Sid = np.argmax(Snodes)
                 self.current_Sval = np.max(Snodes)
 
-        if self.N > 1:
-            idsorted = np.argsort(Snodes)
-            secondmaxid = idsorted[-2]
-            self.second_Sval = Snodes[secondmaxid]
-        else:
-            self.second_Sval = 0
         return self.current_Sid, Snodes
 
     def reset(self):
         self.current_Sid = 0  # Current ID of the state node
         self.current_Sval = 0
-        self.second_Sval = 0
 
-
-
-class HippoLearner:
-    def __init__(self, R, L, NL):
-        self.K = R + L - 1  # Number of columns of J
-
-        self.current_F = 0
-        self.previous_F = 0  # Number of feature nodes when the learning started
-        self.N = 0  # Number of state nodes
-        self.J = MatrixJ(self.N, self.current_F, self.K)  # MatrixJ mapping J.reshape(N, -1) @ X.flatten() = State vector
-        self.learn_mode = False
-        self.NL = NL  #  Number of learning steps.
-        self.learn_l = 0  # the l-th learning step
-        self.learn_S = 0
-        self.current_S = 0
-        self.current_Sval = 1
-
-    def step(self, X):
-        """
-
-        Parameters
-        ----------
-        X : ndarray
-            2-d array with shape (F, K). F = Number of feature nodes. K = R + L - 1.
-
-        Returns
-        -------
-
-        """
-        newF = X.shape[0]
-        # Conditions trigger learning
-        newF_tag = newF > self.current_F
-
-        # if (newF > self.current_F) or ((self.current_Sval < 0.9) and X.sum() > 1):
-        if (newF > self.current_F):
-            if  (self.learn_l == 0) and (self.learn_mode==False) :
-                self.learn_mode = True
-                # Create a new state node
-                self.N = self.J.expand_N(1)
-
-        # Once learning is triggered
-        if self.learn_mode:
-            # Extend self.J.mat to the shape of X
-            dF = newF - self.J.mat.shape[1]
-            self.current_F = self.J.expand_F(dF)
-
-            # Associate X and J to N-th node
-            self.J.increment(X, self.N-1)
-
-            self.learn_l += 1
-            self.learn_S = self.N-1
-
-            if self.learn_l == (self.NL-1):
-                self.J.normalize()
-                self.learn_l = 0
-                self.learn_mode = False
-
-
-    def infer_state(self, X):
-        if self.learn_mode:
-            self.current_S = self.learn_S
-            Snodes = np.zeros(self.N)
-            Snodes[self.current_S] = 1
-            self.current_Sval = 1
-
-        else:
-
-            if self.N == 0:
-                Snodes = np.ones(1)
-
-            elif X.sum() < 1e-6:
-                # if No feature nodes were observed, use the previous state as inferred result
-                Snodes = np.zeros(self.N)
-                Snodes[self.current_S] = 1
-                self.current_Sval = 1
-
-            else:
-                Snodes = self.J.mat.reshape(self.N, self.current_F * self.K) @ X.flatten()
-                self.current_S = np.argmax(Snodes)
-                self.current_Sval = np.max(Snodes)
-
-        return self.current_S, Snodes
-
-
+    def reach_maximum(self):
+        return self.N >= self.maxN
 
 

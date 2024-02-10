@@ -73,7 +73,7 @@ class SequencesTestCase(unittest.TestCase):
         for i, fX in enumerate(all_fXs):
             print('fX %d' % (i+1))
             f, X, fsigma = fX
-            seq.step(f)
+            seq.learn(f)
             self.assertListEqual(X.tolist(), seq.X.tolist())
             self.assertDictEqual(fsigma, seq.f_sigma)
 
@@ -85,7 +85,7 @@ class SequencesTestCase(unittest.TestCase):
             f, X, fsigma = fX
             f_str = [str(v) for v in f]
             fsigma_str = {str(k):v for k, v in fsigma.items()}
-            seq.step(f_str)
+            seq.learn(f_str)
             self.assertListEqual(X.tolist(), seq.X.tolist())
             self.assertDictEqual(fsigma_str, seq.f_sigma)
 
@@ -147,7 +147,7 @@ class SequencesTestCase(unittest.TestCase):
         for i, fX in enumerate(all_fXs):
             print('fX %d' % (i+1))
             f, X, fsigma = fX
-            seq.step(f)
+            seq.learn(f)
             self.assertListEqual(X.tolist(), seq.X.tolist())
             self.assertDictEqual(fsigma, seq.f_sigma)
 
@@ -159,7 +159,7 @@ class SequencesTestCase(unittest.TestCase):
             f, X, fsigma = fX
             f_str = [str(v) for v in f]
             fsigma_str = {str(k):v for k, v in fsigma.items()}
-            seq.step(f_str)
+            seq.learn(f_str)
             self.assertListEqual(X.tolist(), seq.X.tolist())
             self.assertDictEqual(fsigma_str, seq.f_sigma)
 

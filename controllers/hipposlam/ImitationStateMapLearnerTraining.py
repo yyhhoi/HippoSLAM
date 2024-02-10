@@ -13,28 +13,28 @@ from hipposlam.utils import read_pickle
 # Paths
 save_dir = join('data', 'StateMapLearner')
 offline_data_pth = join(save_dir, 'AvoidanceReplayBuffer.pickle')
-save_chpt_pth = join(save_dir, 'NavieControllerCKPT.pt')
+save_chpt_pth = join(save_dir, 'NaiveControllerCKPT.pt')
 loss_records_pth = join(save_dir, 'NaiveControllerLOSS.png')
 
 # Paramters
-obs_dim = 100
+obs_dim = 265
 act_dim = 3
 gamma = 0.99
 lam = 1
 use_adv = True
-batch_size = 1024
-max_buffer_size = 20000
+batch_size = 4096
+max_buffer_size = 50000
 Niters = 50000
 
 # Initialize Networks
-critic = MLP(obs_dim, act_dim, [128, 128, 128])
-critic_target = MLP(obs_dim, act_dim, [128, 128, 128])
-actor = MLP(obs_dim, act_dim, [128, 128, 64])
+critic = MLP(obs_dim, act_dim, [128, 128])
+critic_target = MLP(obs_dim, act_dim, [128, 128])
+actor = MLP(obs_dim, act_dim, [128, 64])
 
 
 # Initialize Replay buffer
-memory = ReplayMemoryAWAC(max_size=max_buffer_size)
-datainds = np.cumsum([0, obs_dim, 1, obs_dim, 1, 1])
+memory = ReplayMemoryAWAC(max_size=max_buffer_size, discrete_obs=obs_dim)
+datainds = np.cumsum([0, 1, 1, 1, 1, 1])
 memory.specify_data_tuple(s=(datainds[0], datainds[1]), a=(datainds[1], datainds[2]),
                           snext=(datainds[2], datainds[3]), r=(datainds[3], datainds[4]),
                           end=(datainds[4], datainds[5]))
@@ -44,9 +44,9 @@ agent = AWAC(critic, critic_target, actor,
              lam=lam,
              gamma=gamma,
              num_action_samples=10,
-             critic_lr=2e-4,  # 5e-4
-             actor_lr=2e-4,  # 5e-4
-             weight_decay=5e-5,
+             critic_lr=1e-4,  # 5e-4
+             actor_lr=1e-4,  # 5e-4
+             weight_decay=0,
              use_adv=True)
 
 # Load offline data and add to replay buffer

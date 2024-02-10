@@ -85,14 +85,13 @@ class ReplayMemoryAWAC(ReplayMemory):
         end = data[:, self.sliceinds[4][0]:self.sliceinds[4][1]]  # (Nsamp, 1) float32
 
         if self.discrete_obs:
-            s2 = torch.nn.functional.one_hot(s.to(torch.int64), num_classes=self.discrete_obs).squeeze()
-            s2next = torch.nn.functional.one_hot(snext.to(torch.int64), num_classes=self.discrete_obs).squeeze()
+            s2 = torch.nn.functional.one_hot(s.to(torch.int64), num_classes=self.discrete_obs).squeeze()  # (Nsamp, obs_classes)
+            s2next = torch.nn.functional.one_hot(snext.to(torch.int64), num_classes=self.discrete_obs).squeeze() # (Nsamp, obs_classes)
             data_tuple = (s2.to(torch.float32), a, s2next.to(torch.float32), r, end)
         else:
             data_tuple = (s, a, snext, r, end)
         return data_tuple
 
-    def specify_obs_classes(self):
     def specify_data_tuple(self, s: Tuple[int, int], a: Tuple[int, int], snext: Tuple[int, int], r: Tuple[int, int],
                            end: Tuple[int, int]):
         self.sliceinds = (s, a, snext, r, end)

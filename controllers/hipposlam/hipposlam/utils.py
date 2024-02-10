@@ -1,5 +1,5 @@
 import pickle
-
+import pandas as pd
 import numpy as np
 
 
@@ -33,3 +33,17 @@ def breakroom_avoidance_policy(x, y, dsval, noise=0.3):
         a = int(np.random.randint(0, 3))
 
     return a
+
+
+class PerformanceRecorder:
+    def __init__(self, save_pth):
+        self.save_pth = save_pth
+        self.records_dict = {'t':[], 'r':[]}
+
+    def record(self, t, r):
+        self.records_dict['t'].append(t)
+        self.records_dict['r'].append(r)
+
+    def to_csv(self):
+        records_df = pd.DataFrame(self.records_dict)
+        records_df.to_csv(self.save_pth)

@@ -133,7 +133,7 @@ for i in range(500):
         dist = torch.distributions.Categorical(probs=probs)
         action = dist.sample()
 
-        next_state, reward, done, info = env.step(action.detach().data.numpy())
+        next_state, reward, done, info = env.learn(action.detach().data.numpy())
 
         total_reward += reward
         steps += 1
