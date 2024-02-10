@@ -66,9 +66,10 @@ class ReplayMemory:
 
 
 class ReplayMemoryAWAC(ReplayMemory):
-    def __init__(self, max_size):
+    def __init__(self, max_size, discrete_obs = None):
         super().__init__(max_size)
-        self.sliceinds = None
+        self.sliceinds = None  # reserved
+        self.discrete_obs = discrete_obs  # None or int
 
     def sample(self, batch_size):
         assert self.sliceinds is not None
@@ -77,14 +78,21 @@ class ReplayMemoryAWAC(ReplayMemory):
         else:
             indices = sample(range(self.size), batch_size)
         data = torch.vstack([self.buffer[index] for index in indices])
-        s = data[:, self.sliceinds[0][0]:self.sliceinds[0][1]]  # (Nsamp, obs_dim)
-        a = data[:, self.sliceinds[1][0]:self.sliceinds[1][1]].to(torch.int64)  # (Nsamp, act_dim)
-        snext = data[:, self.sliceinds[2][0]:self.sliceinds[2][1]]  # (Nsamp, obs_dim)
-        r = data[:, self.sliceinds[3][0]:self.sliceinds[3][1]]  # (Nsamp, 1)
-        end = data[:, self.sliceinds[4][0]:self.sliceinds[4][1]]  # (Nsamp, 1)
-        data_tuple = (s, a, snext, r, end)
+        s = data[:, self.sliceinds[0][0]:self.sliceinds[0][1]]  # (Nsamp, obs_dim) float32, or (Nsamp, 1) float32 if discrete
+        a = data[:, self.sliceinds[1][0]:self.sliceinds[1][1]].to(torch.int64)  # (Nsamp, act_dim) int64
+        snext = data[:, self.sliceinds[2][0]:self.sliceinds[2][1]]  # (Nsamp, obs_dim) float32, or (Nsamp, 1) float32 if discrete
+        r = data[:, self.sliceinds[3][0]:self.sliceinds[3][1]]  # (Nsamp, 1) float32
+        end = data[:, self.sliceinds[4][0]:self.sliceinds[4][1]]  # (Nsamp, 1) float32
+
+        if self.discrete_obs:
+            s2 = torch.nn.functional.one_hot(s.to(torch.int64), num_classes=self.discrete_obs).squeeze()
+            s2next = torch.nn.functional.one_hot(snext.to(torch.int64), num_classes=self.discrete_obs).squeeze()
+            data_tuple = (s2.to(torch.float32), a, s2next.to(torch.float32), r, end)
+        else:
+            data_tuple = (s, a, snext, r, end)
         return data_tuple
 
+    def specify_obs_classes(self):
     def specify_data_tuple(self, s: Tuple[int, int], a: Tuple[int, int], snext: Tuple[int, int], r: Tuple[int, int],
                            end: Tuple[int, int]):
         self.sliceinds = (s, a, snext, r, end)
