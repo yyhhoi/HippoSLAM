@@ -12,14 +12,14 @@ from hipposlam.utils import read_pickle
 
 # Paths
 save_dir = join('data', 'OmniscientLearner')
-offline_data_pth = join(save_dir, 'NaiveController_ReplayBuffer.pickle')
-save_chpt_pth = join(save_dir, 'OfflineTrainedComplex_CHPT.pt')
-loss_records_pth = join(save_dir, 'OfflineTrainedComplex_LOSS.png')
+offline_data_pth = join(save_dir, 'NaiveControllerNoNegR_ReplayBuffer.pickle')
+save_chpt_pth = join(save_dir, 'OfflineTrainedNoNegR_CHPT.pt')
+loss_records_pth = join(save_dir, 'OfflineTrainedNoNegR_LOSS.png')
 
 # Paramters
 obs_dim = 8
 act_dim = 3
-gamma = 0.9
+gamma = 0.99
 lam = 1
 use_adv = True
 batch_size = 1024
@@ -27,9 +27,9 @@ max_buffer_size = 50000
 Niters = 50000
 
 # Initialize Networks
-critic = MLP(obs_dim, act_dim, [128, 128, 128])
-critic_target = MLP(obs_dim, act_dim, [128, 128, 128])
-actor = MLP(obs_dim, act_dim, [128, 128, 64])
+critic = MLP(obs_dim, act_dim, [128, 128])
+critic_target = MLP(obs_dim, act_dim, [128, 128])
+actor = MLP(obs_dim, act_dim, [128, 64])
 
 
 # Initialize Replay buffer
@@ -43,9 +43,9 @@ memory.specify_data_tuple(s=(datainds[0], datainds[1]), a=(datainds[1], datainds
 agent = AWAC(critic, critic_target, actor,
              lam=lam,
              gamma=gamma,
-             num_action_samples=10,
-             critic_lr=1e-4,  # 5e-4
-             actor_lr=1e-4,  # 5e-4
+             num_action_samples=100,  # 10
+             critic_lr=5e-4,  # 5e-4
+             actor_lr=5e-4,  # 5e-4
              weight_decay=0,
              use_adv=True)
 

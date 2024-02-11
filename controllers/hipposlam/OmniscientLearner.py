@@ -119,7 +119,7 @@ def learn_by_AWAC():
 
 def naive_avoidance():
     # Paths
-    model_name = 'NaiveController'
+    model_name = 'NaiveControllerNoNegR'
     save_replay_pth = join('data', 'OmniscientLearner', '%s_ReplayBuffer.pickle'%model_name)
     save_record_pth = join('data', 'OmniscientLearner', '%s_Performance.csv'%model_name)
 
@@ -152,7 +152,7 @@ def naive_avoidance():
                 s, np.array([a]), snext, np.array([r]), np.array([done])
             ])
             exp_list.append(experience)
-            PRtraj.record(i=i, t=t, r=r)
+
 
             # Increment
             s = snext
@@ -164,6 +164,7 @@ def naive_avoidance():
                 print(msg)
                 break
 
+        PRtraj.record(i=i, t=t, r=r)
         # Store data
         data['episodes'].append(np.vstack(exp_list))
         data['end_r'].append(r)
@@ -171,11 +172,10 @@ def naive_avoidance():
         if r > 0:
             cum_win += 1
         i += 1
-        print()
 
     # Saving
     save_pickle(save_replay_pth, data)
-    PRtraj.to_csv()
+    PRtraj.to_csv(save_record_pth)
 
 def fine_tune_trained_model():
     # Modes
@@ -185,8 +185,8 @@ def fine_tune_trained_model():
 
     # Paths
     save_dir = join('data', 'OmniscientLearner')
-    load_model_name = 'OfflineTrainedComplex'
-    save_model_name = 'FinetunedComplex1'
+    load_model_name = 'FinetunedNoNegR1'
+    save_model_name = 'FinetunedNoNegR2'
     offline_data_pth = join(save_dir, 'NaiveController_ReplayBuffer.pickle')
     load_ckpt_pth = join(save_dir, '%s_CHPT.pt' % load_model_name)
     save_ckpt_pth = join(save_dir, '%s_CHPT.pt' % save_model_name)
@@ -197,21 +197,21 @@ def fine_tune_trained_model():
     # Parameters
     obs_dim = 8
     act_dim = 3
-    gamma = 0.9
+    gamma = 0.99
     lam = 1
     batch_size = 1024
-    max_buffer_size = 10000
+    max_buffer_size = 5000
 
     # Initialize models
-    critic = MLP(obs_dim, act_dim, [128, 128, 128])
-    critic_target = MLP(obs_dim, act_dim, [128, 128, 128])
-    actor = MLP(obs_dim, act_dim, [128, 128, 64])
+    critic = MLP(obs_dim, act_dim, [128, 128])
+    critic_target = MLP(obs_dim, act_dim, [128, 128])
+    actor = MLP(obs_dim, act_dim, [128, 64])
     agent = AWAC(critic, critic_target, actor,
                  lam=lam,
                  gamma=gamma,
-                 num_action_samples=10,
-                 critic_lr=1e-4,
-                 actor_lr=1e-4,
+                 num_action_samples=100,
+                 critic_lr=5e-4,
+                 actor_lr=5e-4,
                  weight_decay=0,
                  use_adv=True)
     agent.load_checkpoint(load_ckpt_pth)

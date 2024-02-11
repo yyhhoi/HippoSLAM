@@ -139,7 +139,7 @@ class BreakRoom(Supervisor, gym.Env):
         if stuck:
             print("\n================== Robot is stuck =================================\n")
             print('stuck_m = %0.4f'%(self.stuck_m))
-            reward, done = -1, True
+            reward, done = 0, True
 
 
         # Fallen detection
@@ -148,7 +148,7 @@ class BreakRoom(Supervisor, gym.Env):
             print('\n================== Robot has fallen %s=============================\n'%(str(fallen)))
             print('Rotations = %0.4f, %0.4f, %0.4f, %0.4f '%(rotx, roty, rotz, rota))
             print('Abs x and y = %0.4f, %0.4f'%(np.abs(rotx), (np.abs(roty))))
-            reward, done = -1, True
+            reward, done = 0, True
             if self.fallen:
                 self.fallen_seq += 1
             if self.fallen_seq > 5:
