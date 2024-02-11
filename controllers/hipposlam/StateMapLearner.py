@@ -100,7 +100,6 @@ def fine_tune_trained_model():
 
 
     # Paths
-
     offline_data_pth = join('data', 'StateMapLearner', 'AvoidanceReplayBuffer.pickle')
     load_ckpt_pth = join('data', 'StateMapLearner', 'NaiveControllerCKPT.pt')
     # load_ckpt_pth = join('data', 'StateMapLearner', 'FineTuned1.pt')
@@ -198,8 +197,9 @@ def fine_tune_trained_model():
             closs = critic_loss.item()
             aloss = actor_loss.item()
             print('Training finished. C/A Loss = %0.6f, %0.6f' % (closs, aloss))
-    agent.save_checkpoint(save_ckpt_pth)
 
+    # Saving
+    agent.save_checkpoint(save_ckpt_pth)
     if save_replay_buffer:
         memory.save_buffer_torch(save_buffer_pth)
     if save_this_hipposlam:

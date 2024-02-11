@@ -65,7 +65,7 @@ for i in range(Niters):
     aloss = actor_loss.item()
     closs_list.append(closs)
     aloss_list.append(aloss)
-    if i % 100 == 0:
+    if i % 1000 == 0:
         print('Training %d/%d. C/A Loss = %0.6f, %0.6f' % (i, Niters, closs, aloss))
 
 # Save checkpoints

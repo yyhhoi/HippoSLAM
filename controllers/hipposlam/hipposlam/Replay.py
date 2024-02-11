@@ -71,13 +71,17 @@ class ReplayMemoryAWAC(ReplayMemory):
         self.sliceinds = None  # reserved
         self.discrete_obs = discrete_obs  # None or int
 
-    def sample(self, batch_size):
+    def sample(self, batch_size, online=False):
         assert self.sliceinds is not None
         if self.size <= batch_size:
             indices = [ind for ind in range(self.size)]
         else:
             indices = sample(range(self.size), batch_size)
         data = torch.vstack([self.buffer[index] for index in indices])
+        data_tuple = self.online_process(data)
+        return data_tuple
+
+    def online_process(self, data):
         s = data[:, self.sliceinds[0][0]:self.sliceinds[0][1]]  # (Nsamp, obs_dim) float32, or (Nsamp, 1) float32 if discrete
         a = data[:, self.sliceinds[1][0]:self.sliceinds[1][1]].to(torch.int64)  # (Nsamp, act_dim) int64
         snext = data[:, self.sliceinds[2][0]:self.sliceinds[2][1]]  # (Nsamp, obs_dim) float32, or (Nsamp, 1) float32 if discrete

@@ -36,14 +36,16 @@ def breakroom_avoidance_policy(x, y, dsval, noise=0.3):
 
 
 class PerformanceRecorder:
-    def __init__(self, save_pth):
-        self.save_pth = save_pth
-        self.records_dict = {'t':[], 'r':[]}
+    def __init__(self, *args):
+        self.records_dict = {key:[] for key in args}
+        self.records_df = None
 
-    def record(self, t, r):
-        self.records_dict['t'].append(t)
-        self.records_dict['r'].append(r)
+    def record(self, **kwargs):
+        for key, val in kwargs.items():
+            self.records_dict[key].append(val)
 
-    def to_csv(self):
-        records_df = pd.DataFrame(self.records_dict)
-        records_df.to_csv(self.save_pth)
+    def to_csv(self, save_pth):
+        self.records_df = pd.DataFrame(self.records_dict)
+        self.records_df.to_csv(save_pth)
+
+

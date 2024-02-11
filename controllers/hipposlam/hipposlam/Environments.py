@@ -18,7 +18,7 @@ class BreakRoom(Supervisor, gym.Env):
         self.observation_space = None
         # ============================================================================================
 
-        self.spec = gym.envs.registration.EnvSpec(id='WeBotsQ-v0', max_episode_steps=max_episode_steps)
+        # self.spec = gym.envs.registration.EnvSpec(id='WeBotsQ-v0', max_episode_steps=max_episode_steps)
         self.spawn_mode = spawn  # 'all' or 'start'
         self.goal_mode = goal  # 'easy' or 'hard'
         self.use_ds = use_ds
@@ -72,7 +72,9 @@ class BreakRoom(Supervisor, gym.Env):
     def get_obs(self):
         new_x, new_y, _ = self._get_translation()
         rotx, roty, rotz, rota = self._get_rotation()
-        obs = np.array([new_x, new_y, rotx, roty, rotz, rota])
+        sign = np.sign(rotz)
+        rotax, rotay = np.sin(rota * sign), np.sin(roty * sign)
+        obs = np.array([new_x, new_y, rotx, roty, rotz, rota, rotax, rotay])
         return obs
 
     def reset(self):

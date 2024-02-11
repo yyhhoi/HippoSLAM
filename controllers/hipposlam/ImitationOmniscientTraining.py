@@ -11,19 +11,19 @@ from hipposlam.utils import read_pickle
 
 
 # Paths
-save_dir = join('data', 'Omniscient')
-offline_data_pth = join(save_dir, 'naive_controller_data.pickle')
-save_chpt_pth = join(save_dir, 'NaiveControllerLayer3CHPT.pt')
-loss_records_pth = join(save_dir, 'NaiveControllerLayer3LOSS.png')
+save_dir = join('data', 'OmniscientLearner')
+offline_data_pth = join(save_dir, 'NaiveController_ReplayBuffer.pickle')
+save_chpt_pth = join(save_dir, 'OfflineTrainedComplex_CHPT.pt')
+loss_records_pth = join(save_dir, 'OfflineTrainedComplex_LOSS.png')
 
 # Paramters
-obs_dim = 6
+obs_dim = 8
 act_dim = 3
-gamma = 0.99
+gamma = 0.9
 lam = 1
 use_adv = True
 batch_size = 1024
-max_buffer_size = 20000
+max_buffer_size = 50000
 Niters = 50000
 
 # Initialize Networks
@@ -44,14 +44,14 @@ agent = AWAC(critic, critic_target, actor,
              lam=lam,
              gamma=gamma,
              num_action_samples=10,
-             critic_lr=2e-4,  # 5e-4
-             actor_lr=2e-4,  # 5e-4
-             weight_decay=5e-5,
+             critic_lr=1e-4,  # 5e-4
+             actor_lr=1e-4,  # 5e-4
+             weight_decay=0,
              use_adv=True)
 
 # Load offline data and add to replay buffer
 data = read_pickle(offline_data_pth)
-memory.from_offline_np(data['traj'])  # (time, data_dim=15)
+memory.from_offline_np(data['episodes'])  # (time, data_dim=15)
 print('Replay buffer has %d samples'%(len(memory)))
 
 # Training
@@ -65,7 +65,7 @@ for i in range(Niters):
     aloss = actor_loss.item()
     closs_list.append(closs)
     aloss_list.append(aloss)
-    if i % 100 == 0:
+    if i % 1000 == 0:
         print('Training %d/%d. C/A Loss = %0.6f, %0.6f' % (i, Niters, closs, aloss))
 
 # Save checkpoints
