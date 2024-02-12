@@ -3,14 +3,14 @@ from pprint import PrettyPrinter
 import numpy as np
 
 from controller import Supervisor
-import gymnasium as gym
+import gym
 
 from .Sequences import Sequences, StateDecoder
 from .utils import save_pickle, read_pickle
 
 
 class BreakRoom(Supervisor, gym.Env):
-    def __init__(self, max_episode_steps=1000, use_ds=True,  spawn='all', goal='hard'):
+    def __init__(self, max_episode_steps=300, use_ds=True,  spawn='all', goal='hard'):
         super().__init__()
 
         # ====================== To be defined by child class ========================================
@@ -18,7 +18,7 @@ class BreakRoom(Supervisor, gym.Env):
         self.observation_space = None
         # ============================================================================================
 
-        # self.spec = gym.envs.registration.EnvSpec(id='WeBotsQ-v0', max_episode_steps=max_episode_steps)
+        self.spec = gym.envs.registration.EnvSpec(id='WeBotsQ-v0', max_episode_steps=max_episode_steps)
         self.spawn_mode = spawn  # 'all' or 'start'
         self.goal_mode = goal  # 'easy' or 'hard'
         self.use_ds = use_ds
@@ -141,7 +141,7 @@ class BreakRoom(Supervisor, gym.Env):
         if stuck:
             print("\n================== Robot is stuck =================================\n")
             print('stuck_m = %0.4f'%(self.stuck_m))
-            reward, done = 0, True
+            reward, done = -1, True
 
 
         # Fallen detection
@@ -150,7 +150,7 @@ class BreakRoom(Supervisor, gym.Env):
             print('\n================== Robot has fallen %s=============================\n'%(str(fallen)))
             print('Rotations = %0.4f, %0.4f, %0.4f, %0.4f '%(rotx, roty, rotz, rota))
             print('Abs x and y = %0.4f, %0.4f'%(np.abs(rotx), (np.abs(roty))))
-            reward, done = 0, True
+            reward, done = -1, True
             if self.fallen:
                 self.fallen_seq += 1
             if self.fallen_seq > 5:
@@ -243,9 +243,9 @@ class BreakRoom(Supervisor, gym.Env):
 class OmniscientLearner(BreakRoom):
     def __init__(self, max_episode_steps=1000, use_ds=True,  spawn='all', goal='hard'):
         super(OmniscientLearner, self).__init__(max_episode_steps, use_ds, spawn, goal)
-        lowBox = np.array([-7, -3, -1, -1, -1, -2 * np.pi], dtype=np.float32)
-        highBox = np.array([7,  5,  1,  1,  1,  2 * np.pi], dtype=np.float32)
-        self.obs_dim = 6
+        lowBox = np.array([-7, -3, -1, -1, -1, -2 * np.pi, -1, -1], dtype=np.float32)
+        highBox = np.array([7,  5,  1,  1,  1,  2 * np.pi, 1, 1], dtype=np.float32)
+        self.obs_dim = 8
         self.observation_space = gym.spaces.Box(lowBox, highBox, shape=(self.obs_dim,))
 
 class StateMapLearner(BreakRoom):

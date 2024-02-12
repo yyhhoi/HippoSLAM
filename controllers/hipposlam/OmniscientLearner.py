@@ -11,7 +11,29 @@ from hipposlam.utils import save_pickle, read_pickle, breakroom_avoidance_policy
 from hipposlam.Networks import MLP
 from hipposlam.ReinforcementLearning import AWAC, A2C, compute_discounted_returns
 from hipposlam.Environments import OmniscientLearner
+from stable_baselines3 import PPO
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
+
+def StartSB():
+    # Modes
+
+
+    # Paths
+    save_dir = join('data', 'OmniscientLearner')
+    save_model_name = 'PPO'
+    save_ckpt_pth = join(save_dir, '%s_CHPT.pt' % save_model_name)
+    save_record_pth = join(save_dir, '%s_Records.csv'%save_model_name)
+    save_plot_pth = join(save_dir, '%s_LOSS.png'% save_model_name)
+
+
+
+    # Environment
+    env = OmniscientLearner(spawn='start', goal='hard', use_ds=False)
+    PR = PerformanceRecorder('i', 't', 'r')
+
+    model = PPO("MlpPolicy", env, verbose=1)
+    model.learn(total_timesteps=25000)
+    model.save("PPO_OmniscientLearner")
 
 
 def StartOnlineA2C():
@@ -47,7 +69,7 @@ def StartOnlineA2C():
                               G=(datainds[2], datainds[3]))
 
     # Environment
-    env = OmniscientLearner(spawn='start', goal='hard', use_ds=False)
+    env = OmniscientLearner(spawn='all', goal='hard', use_ds=False)
     PR = PerformanceRecorder('i', 't', 'r', 'closs', 'aloss')
 
     # Unrolle
@@ -383,5 +405,6 @@ def main():
     # evaluate_trained_model()
     # fine_tune_trained_model()
     StartOnlineA2C()
+    # StartSB()
 if __name__ == '__main__':
     main()
