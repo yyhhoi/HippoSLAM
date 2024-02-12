@@ -119,17 +119,17 @@ class MatrixJ:
 
 
 class StateDecoder:
-    def __init__(self, R, L):
+    def __init__(self, R, L, maxN=500):
         self.R = R
         self.K = R + L - 1  # Number of columns of decoder matrix J
         self.N = 0  # Number of state nodes
-        self.maxN = 500  # When N reaches the maximum, no new node will be expanded.
+        self.maxN = maxN  # When N reaches the maximum, no new node will be expanded.
         self.learn_mode = True  # Whether expanding new state is allowed.
         self.current_F = 0
         self.current_Sid = 0  # Current ID of the state node
         self.current_Sval = 0
         self.second_Sval = 0
-        self.lowSThresh = 0.21
+        self.lowSThresh = 0.11
         self.J = MatrixJ(self.N, self.current_F,
                          self.K)  # MatrixJ mapping J.reshape(N, -1) @ X.flatten() = State vector
         self.sid_special = []

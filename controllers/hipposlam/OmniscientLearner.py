@@ -21,15 +21,9 @@ def StartSB():
     # Paths
     save_dir = join('data', 'OmniscientLearner')
     save_model_name = 'PPO'
-    save_ckpt_pth = join(save_dir, '%s_CHPT.pt' % save_model_name)
-    save_record_pth = join(save_dir, '%s_Records.csv'%save_model_name)
-    save_plot_pth = join(save_dir, '%s_LOSS.png'% save_model_name)
-
-
 
     # Environment
-    env = OmniscientLearner(spawn='start', goal='hard', use_ds=False)
-    PR = PerformanceRecorder('i', 't', 'r')
+    env = OmniscientLearner(spawn='start', goal='easy', use_ds=False)
 
     model = PPO("MlpPolicy", env, verbose=1)
     model.learn(total_timesteps=25000)
@@ -38,17 +32,19 @@ def StartSB():
 
 def StartOnlineA2C():
     # Modes
-
+    load_model = False
 
     # Paths
     save_dir = join('data', 'OmniscientLearner')
+    load_model_name = ''
     save_model_name = 'OnlineA2C1'
+    load_model_pth = join(save_dir, '%s_CHPT.pt' % load_model_name)
     save_ckpt_pth = join(save_dir, '%s_CHPT.pt' % save_model_name)
     save_record_pth = join(save_dir, '%s_Records.csv'%save_model_name)
     save_plot_pth = join(save_dir, '%s_LOSS.png'% save_model_name)
 
     # Parameters
-    obs_dim = 8
+    obs_dim = 6
     act_dim = 3
     gamma = 0.9
 
@@ -61,6 +57,8 @@ def StartOnlineA2C():
                  critic_lr=1e-3,
                  actor_lr=1e-3,
                  weight_decay=0)
+    if load_model:
+        agent.load_checkpoint(load_model_pth)
 
     # Initialize Replay buffer
     memory = ReplayMemoryA2C()
@@ -69,11 +67,11 @@ def StartOnlineA2C():
                               G=(datainds[2], datainds[3]))
 
     # Environment
-    env = OmniscientLearner(spawn='all', goal='hard', use_ds=False)
+    env = OmniscientLearner(spawn='start', goal='easy', use_ds=False)
     PR = PerformanceRecorder('i', 't', 'r', 'closs', 'aloss')
 
     # Unrolle
-    Niters = 200
+    Niters = 500
     maxtimeout = 300
     for i in range(Niters):
         print('Episode %d/%d'%(i, Niters))
@@ -90,10 +88,11 @@ def StartOnlineA2C():
 
             # Step
             snext, r, done, info = env.step(a)
+            r -= t/maxtimeout
+
 
             # Store data
-            experience = torch.concat([s.squeeze(), torch.tensor([a])])
-            explist.append(experience.to(torch.float))
+            explist.append(torch.concat([s.squeeze(), torch.tensor([a])]).to(torch.float))
             r_end_list.append(torch.tensor([r, done]).to(torch.float32))
 
             # Increment
@@ -118,7 +117,7 @@ def StartOnlineA2C():
         exptmp = torch.vstack(explist)
         r_end = torch.vstack(r_end_list)
         G = compute_discounted_returns(r_end[:, 0], r_end[:, 1], last_v.squeeze().detach().item(), gamma)
-        print(np.around(G, 2))
+        # print(np.around(G, 2))
         exp = torch.hstack([exptmp, torch.from_numpy(G).to(torch.float32).view(-1, 1)])
         _s, _a, _G = memory.online_process(exp)
         critic_loss, actor_loss = agent.update_networks(_s, _a, _G)
@@ -404,7 +403,7 @@ def main():
     # naive_avoidance()
     # evaluate_trained_model()
     # fine_tune_trained_model()
-    StartOnlineA2C()
-    # StartSB()
+    # StartOnlineA2C()
+    StartSB()
 if __name__ == '__main__':
     main()

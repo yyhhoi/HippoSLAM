@@ -52,10 +52,11 @@ for n_epi in range(Niters):
     s, _ = env.reset()
     cum_r = 0
     truncated = False
+    done = False
     explist = []
     r_end_list = []
     t = 0
-    while True and (truncated is False) and (t < maxtimesteps):
+    while True:
         s = torch.from_numpy(s).to(torch.float32).view(-1, obs_dim)  # (1, obs_dim)
         a = int(agent.get_action(s).squeeze())  # tensor (1, 1) -> int
         snext, r, done, truncated, info = env.step(a)
@@ -68,9 +69,13 @@ for n_epi in range(Niters):
         s = snext
         cum_r += 1
         t += 1
-        if done:
-            rewards_alleps.append(cum_r)
+        if t > maxtimesteps:
             break
+        if done or truncated:
+            break
+
+
+    rewards_alleps.append(cum_r)
 
     # Last v
     with torch.no_grad():
@@ -86,7 +91,6 @@ for n_epi in range(Niters):
     critic_loss, actor_loss = agent.update_networks(_s, _a, _G)
     critic_losses.append(critic_loss.item())
     actor_losses.append(actor_loss.item())
-
 fig, ax = plt.subplots(3, 1, figsize=(10,8), sharex=True)
 ax[0].plot(rewards_alleps)
 ax[0].set_ylabel('Cum R')
@@ -94,5 +98,5 @@ ax[1].plot(critic_losses)
 ax[1].set_ylabel('Critic loss')
 ax[2].plot(actor_losses)
 ax[2].set_ylabel('Actor loss')
-fig.savefig('A2C_target_NotG.png', dpi=200)
+fig.savefig('A2C_smalllr.png', dpi=200)
 plt.show()

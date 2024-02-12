@@ -72,9 +72,9 @@ class BreakRoom(Supervisor, gym.Env):
     def get_obs(self):
         new_x, new_y, _ = self._get_translation()
         rotx, roty, rotz, rota = self._get_rotation()
-        sign = np.sign(rotz)
-        rotax, rotay = np.sin(rota * sign), np.sin(roty * sign)
-        obs = np.array([new_x, new_y, rotx, roty, rotz, rota, rotax, rotay])
+        norma = np.sign(rotz) * rota
+        cosa, sina = np.cos(norma), np.sin(norma)
+        obs = np.array([new_x, new_y, rotx, roty, cosa, sina])
         return obs
 
     def reset(self):
@@ -130,7 +130,8 @@ class BreakRoom(Supervisor, gym.Env):
 
 
         # Stuck detection
-        dpos = np.sqrt((new_x-self.x)**2 + (new_y - self.y)**2 + (rotz*rota - self.rotz*self.rota)**2)
+        # dpos = np.sqrt((new_x-self.x)**2 + (new_y - self.y)**2 + (rotz*rota - self.rotz*self.rota)**2)
+        dpos = np.sqrt((new_x - self.x) ** 2 + (new_y - self.y) ** 2)
         stuck_count = dpos < self.stuck_epsilon
         self.stuck_m = 0.9 * self.stuck_m + stuck_count * 1.0
         stuck = self.stuck_m > self.stuck_thresh
@@ -141,7 +142,7 @@ class BreakRoom(Supervisor, gym.Env):
         if stuck:
             print("\n================== Robot is stuck =================================\n")
             print('stuck_m = %0.4f'%(self.stuck_m))
-            reward, done = -1, True
+            reward, done = 0, True
 
 
         # Fallen detection
@@ -150,7 +151,7 @@ class BreakRoom(Supervisor, gym.Env):
             print('\n================== Robot has fallen %s=============================\n'%(str(fallen)))
             print('Rotations = %0.4f, %0.4f, %0.4f, %0.4f '%(rotx, roty, rotz, rota))
             print('Abs x and y = %0.4f, %0.4f'%(np.abs(rotx), (np.abs(roty))))
-            reward, done = -1, True
+            reward, done = 0, True
             if self.fallen:
                 self.fallen_seq += 1
             if self.fallen_seq > 5:
@@ -243,15 +244,15 @@ class BreakRoom(Supervisor, gym.Env):
 class OmniscientLearner(BreakRoom):
     def __init__(self, max_episode_steps=1000, use_ds=True,  spawn='all', goal='hard'):
         super(OmniscientLearner, self).__init__(max_episode_steps, use_ds, spawn, goal)
-        lowBox = np.array([-7, -3, -1, -1, -1, -2 * np.pi, -1, -1], dtype=np.float32)
-        highBox = np.array([7,  5,  1,  1,  1,  2 * np.pi, 1, 1], dtype=np.float32)
-        self.obs_dim = 8
+        lowBox = np.array([-7, -3, -1, -1, -1, -1], dtype=np.float32)
+        highBox = np.array([7,  5,  1,  1, 1, 1], dtype=np.float32)
+        self.obs_dim = 6
         self.observation_space = gym.spaces.Box(lowBox, highBox, shape=(self.obs_dim,))
 
 class StateMapLearner(BreakRoom):
-    def __init__(self, max_episode_steps=1000, use_ds=True,  spawn='all', goal='hard'):
+    def __init__(self, max_episode_steps=1000, max_hipposlam_states=500, use_ds=True,  spawn='all', goal='hard'):
         super(StateMapLearner, self).__init__(max_episode_steps, use_ds, spawn, goal)
-        self.observation_space = gym.spaces.Discrete(1000)
+        self.observation_space = gym.spaces.Discrete(max_hipposlam_states)
 
         # Camera
         self.camera_timestep = self.thetastep
@@ -266,7 +267,7 @@ class StateMapLearner(BreakRoom):
         self.obj_dist = 2  # in meters
         R, L = 5, 10
         self.hipposeq = Sequences(R=R, L=L, reobserve=False)
-        self.hippomap = StateDecoder(R, L)
+        self.hippomap = StateDecoder(R, L, maxN=max_hipposlam_states)
 
 
     def get_obs(self):

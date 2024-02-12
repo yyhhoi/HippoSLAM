@@ -71,6 +71,10 @@ class A2C(nn.Module):
         with torch.no_grad():
             logits = self.actor(state)  # (N, obs_dim) -> (N, act_dim)
             dist = Categorical(logits=logits)
+            cosa, sina = state[0, 4].item(), state[0, 5].item()
+            print('x=%0.3f, y=%0.3f, cos = %0.2f, sin = %0.4f, angle = %0.4f'%(state[0, 0].item(), state[0, 1].item(), cosa, sina, np.angle(cosa + 1j * sina)))
+            prob = torch.exp(dist.log_prob(torch.tensor([0, 1, 2])))
+            print('F = %0.4f, L = %0.4f, R = %0.4f'%(prob[0], prob[1], prob[2]))
             return dist.sample(sample_shape=[1]).T  # -> (N, 1)
 
     def update_networks(self, state, action, G):

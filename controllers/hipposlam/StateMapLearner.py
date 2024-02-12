@@ -2,94 +2,180 @@
 
 import numpy as np
 import torch
+from matplotlib import pyplot as plt
+from stable_baselines3 import PPO
 from torch import nn
 
-from controllers.hipposlam.hipposlam.Networks import MLP
-from controllers.hipposlam.hipposlam.ReinforcementLearning import AWAC, BioQ
-from controllers.hipposlam.hipposlam.Replay import ReplayMemoryAWAC
+from hipposlam.Networks import MLP
+from hipposlam.ReinforcementLearning import AWAC, A2C, compute_discounted_returns
+from hipposlam.Replay import ReplayMemoryAWAC, ReplayMemoryA2C
 from hipposlam.utils import breakroom_avoidance_policy, save_pickle, PerformanceRecorder, read_pickle
 from hipposlam.Environments import StateMapLearner
 from os.path import join
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
-def bio_learning():
-    # Tags
-    load_previous_hipposlam = False
+
+
+def StartSB():
+    # Modes
+    load_model = True
+    save_model = True
+    hippomap_learn = False
 
     # Paths
-    model_name = 'BioLearning'
-    save_replay_pth = join('data', 'StateMapLearner', 'AvoidanceReplayBuffer_%s.pickle'%(model_name))
-    load_hipposlam_pth = join('data', 'StateMapLearner', 'hipposlam_%s.pickle'%(model_name))
-    save_hipposlam_pth = join('data', 'StateMapLearner', 'hipposlam_%s.pickle'%(model_name))
-    save_bioq_pth = join('data', 'StateMapLearner', 'bioq_%s.pickle'%(model_name))
-    save_record_pth = join('data', 'StateMapLearner', '%s_Performance.csv'%(model_name))
+    save_dir = join('data', 'StateMapLearner')
+    load_model_name = 'PPO9_NoLearnMap'
+    save_model_name = 'PPO10_NoLearnMap'
+    load_hipposlam_pth = join(save_dir, '%s_hipposlam.pickle' % load_model_name)
+    load_model_pth = join(save_dir, '%s.zip'%(load_model_name))
+    save_hipposlam_pth = join(save_dir, '%s_hipposlam.pickle' % save_model_name)
+    save_model_pth = join(save_dir, '%s.zip' % (save_model_name))
 
     # Environment
-    env = StateMapLearner(spawn='start', goal='easy')
-    if load_previous_hipposlam:
+    env = StateMapLearner(spawn='start', goal='hard', max_hipposlam_states=500, use_ds=False)
+
+
+    # Load models
+    if load_model:
         env.load_hipposlam(load_hipposlam_pth)
+        env.hippomap.learn_mode = hippomap_learn
+        print('Loading hippomap. There are %d states in the hippomap' % (env.hippomap.N))
+        model = PPO.load(load_model_pth, env=env)
+    else:
+        model = PPO("MlpPolicy", env, verbose=1)
 
-    # RL agent
-    agent = BioQ(300)
+    # Train
+    model.learn(total_timesteps=25000)
 
-    # Record data and episodes
-    PR = PerformanceRecorder(save_record_pth)
-    data = {'episodes':[], 'end_r':[], 't':[], 'traj':[]}
-    cum_win = 0
+    # Save models
+    if save_model:
+        model.save(save_model_pth)
+        env.save_hipposlam(save_hipposlam_pth)
+
+    print('After training, there are %d states in the hippomap' % (env.hippomap.N))
+
+def OnlineA2C():
+
+    # Modes
+    load_model = False
+    load_hipposlam = False
+    save_this_hipposlam = True
+    hipposlam_learn_mode = True
+
+
+    # Paths
+    save_dir = join('data', 'StateMapLearner')
+    load_model_name = ''
+    save_model_name = 'OnlineA2C1'
+    load_model_pth = join(save_dir, '%s.pt'%load_model_name)
+    load_hipposlam_pth = join(save_dir, '%s_hipposlam.pickle'%load_model_name)
+    save_model_pth = join(save_dir, '%s.pt'%save_model_name)
+    save_hipposlam_pth = join(save_dir, 'hipposlam_%s.pickle'%save_model_name)
+    save_record_pth = join(save_dir, '%s_Records.csv'%save_model_name)
+    save_plot_pth = join(save_dir, '%s_LOSS.png'% save_model_name)
+
+    # Parameters
+    obs_dim = 100
+    act_dim = 3
+    gamma = 0.9
+
+    # Initialize models
+    critic = MLP(obs_dim, 1, [128, 128])
+    actor = MLP(obs_dim, act_dim, [128, 64])
+    critic_target = MLP(obs_dim, 1, [128, 128])
+    agent = A2C(critic, actor, critic_target=critic_target,
+                 gamma=gamma,
+                 critic_lr=1e-3,
+                 actor_lr=1e-3,
+                 weight_decay=0)
+    if load_model:
+        agent.load_checkpoint(load_model_pth)
+
+    # Initialize Replay buffer
+    memory = ReplayMemoryA2C(discrete_obs=obs_dim)
+    datainds = np.cumsum([0, obs_dim, 1, 1])
+    memory.specify_data_tuple(s=(datainds[0], datainds[1]), a=(datainds[1], datainds[2]),
+                              G=(datainds[2], datainds[3]))
+
+    # Environment
+    env = StateMapLearner(spawn='start', goal='easy', use_ds=False)
+    if load_hipposlam:
+        env.load_hipposlam(load_hipposlam_pth)
+    env.hippomap.learn_mode = hipposlam_learn_mode
+    PR = PerformanceRecorder('i', 't', 'r', 'closs', 'aloss')
+
+    # Unrolle
+    Niters = 200
     maxtimeout = 300
-    while cum_win <= 100:
-        print('Iter %d, cum_win = %d'%(len(data['end_r']), cum_win))
+    for i in range(Niters):
+        print('Episode %d/%d'%(i, Niters))
         s = env.reset()
-        explist = []
-        trajlist = []
         t = 0
+        agent.eval()
+        explist = []
+        r_end_list = []
         while True:
 
             # Policy
-            x, y = env.x, env.y
-            rotz, rota = env.rotz, env.rota
-            agent.expand(s)
-            a, aprob = agent.get_action(s)
-            print('s = %d, a = %d, aprob = '%(s, a), list(np.around(aprob, 3)))
-            print('v = %d, m = ' % (agent.w[s]), list(np.around(agent.m[s, :], 3)))
+            s_onehot = nn.functional.one_hot(torch.LongTensor([s]), num_classes=obs_dim).to(
+                torch.float32)  # (1, obs_classes)
+            a = int(agent.get_action(s_onehot).squeeze())  # tensor (1, 1) -> int
 
             # Step
             snext, r, done, info = env.step(a)
 
-            # Learn
-            agent.update(int(s), a, aprob, r, int(snext), done)
-
-
             # Store data
-            explist.append(np.array([s, a, snext, r, done]))
-            trajlist.append(np.array([x, y, np.sign(rotz)*rota, s]))
-            PR.record(t, r)
+            explist.append(torch.concat([s.squeeze(), torch.tensor([a])]).to(torch.float))
+            r_end_list.append(torch.tensor([r, done]).to(torch.float32))
 
             # Increment
             s = snext
             t += 1
 
-            # Termination condition
+            # Termination
             if done or (t >= maxtimeout):
                 msg = "Done" if done else "Timeout"
                 print(msg)
                 break
 
-        # Store data
-        data['episodes'].append(np.vstack(explist))
-        data['traj'].append(np.vstack(trajlist))
-        data['end_r'].append(r)
-        data['t'].append(t)
-        if r > 0:
-            cum_win += 1
-        print()
+        PR.record(i=i, t=t, r=r)
+
+        # Last v
+        with torch.no_grad():
+            s = torch.from_numpy(s).to(torch.float32).view(-1, obs_dim)
+            last_v = critic(s)
+
+        # Training
+        agent.train()
+        exptmp = torch.vstack(explist)
+        r_end = torch.vstack(r_end_list)
+        G = compute_discounted_returns(r_end[:, 0], r_end[:, 1], last_v.squeeze().detach().item(), gamma)
+        print(np.around(G, 2))
+        exp = torch.hstack([exptmp, torch.from_numpy(G).to(torch.float32).view(-1, 1)])
+        _s, _a, _G = memory.online_process(exp)
+        critic_loss, actor_loss = agent.update_networks(_s, _a, _G)
+        closs = critic_loss.item()
+        aloss = actor_loss.item()
+        PR.record(closs=closs, aloss=aloss)
+        print('Training finished. C/A Loss = %0.6f, %0.6f' % (closs, aloss))
+
 
     # Saving
-    env.save_hipposlam(save_hipposlam_pth)
-    save_pickle(save_replay_pth, data)
-    PR.to_csv()
-    save_pickle(save_bioq_pth, agent)
+    agent.save_checkpoint(save_model_pth)
+    PR.to_csv(save_record_pth)
+    if save_this_hipposlam:
+        env.save_hipposlam(save_hipposlam_pth)
+
+    # Plotting
+    win_mask = PR.records_df['r'] == 1
+    fig, ax = plt.subplots(2, 1, figsize=(10, 8))
+    ax[0].plot(PR.records_df['closs'])
+    ax[0].set_title('Win rate = %0.4f'% win_mask.mean())
+    ax[1].plot(PR.records_df['aloss'])
+    ax[1].set_title('Traj time = %0.4f' % PR.records_df[win_mask]['t'].median())
+    fig.savefig(save_plot_pth, dpi=200)
+
 
 def fine_tune_trained_model():
     # Modes
@@ -347,7 +433,8 @@ def main():
     # naive_avoidance()
     # evaluate_trained_model()
     # fine_tune_trained_model()
-    bio_learning()
+    # bio_learning()
+    StartSB()
     return None
 
 if __name__ == '__main__':
