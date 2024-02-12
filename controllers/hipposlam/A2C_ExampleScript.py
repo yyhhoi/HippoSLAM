@@ -12,23 +12,15 @@ from hipposlam.ReinforcementLearning import compute_discounted_returns, A2C
 
 # Paths and parameters
 env = gym.make("CartPole-v1")
-offline = True
 obs_dim = 4
 act_dim = 2
 gamma = 0.99
 batch_size = 256
 max_buffer_size = 512
-
-if offline:
-    critic_lr = 3e-4
-    actor_lr = 3e-4
-    weight_decay = 1e-4
-    Niters = 1500
-else:
-    critic_lr = 1e-3
-    actor_lr = 1e-3
-    weight_decay = 1e-5
-    Niters = 500
+critic_lr = 1e-3
+actor_lr = 1e-3
+weight_decay = 1e-5
+Niters = 500
 
 
 
@@ -90,24 +82,13 @@ for n_epi in range(Niters):
     G = compute_discounted_returns(r_all, end_all, last_v.squeeze().detach().item(), gamma)
     traj = torch.hstack([traj, torch.from_numpy(G).to(torch.float32).view(-1, 1)])
 
-    if offline:
-        # Store memories
-        for exp in traj:
-            memory.push(exp)
 
-        # Train
-        if len(memory) >= batch_size:
-            _s, _a, _G = memory.sample(batch_size)
-            critic_loss, actor_loss = agent.update_networks(_s, _a, _G)
-            critic_losses.append(critic_loss.item())
-            actor_losses.append(actor_loss.item())
-    else:
-        _s = traj[:, :obs_dim]
-        _a = traj[:, obs_dim:obs_dim+1].to(torch.int64)
-        _G = traj[:, -1:]
-        critic_loss, actor_loss = agent.update_networks(_s, _a, _G)
-        critic_losses.append(critic_loss.item())
-        actor_losses.append(actor_loss.item())
+    _s = traj[:, :obs_dim]
+    _a = traj[:, obs_dim:obs_dim+1].to(torch.int64)
+    _G = traj[:, -1:]
+    critic_loss, actor_loss = agent.update_networks(_s, _a, _G)
+    critic_losses.append(critic_loss.item())
+    actor_losses.append(actor_loss.item())
 
 fig, ax = plt.subplots(1, 3, figsize=(10, 3))
 ax[0].plot(rewards_alleps)
@@ -116,6 +97,5 @@ ax[1].plot(critic_losses)
 ax[1].set_ylabel('Critic loss')
 ax[2].plot(actor_losses)
 ax[2].set_ylabel('Actor loss')
-tag = 'offline' if offline else 'online'
-fig.savefig('A2C_%s.png'%tag, dpi=200)
+fig.savefig('A2C.png', dpi=200)
 plt.show()

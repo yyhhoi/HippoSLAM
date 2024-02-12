@@ -103,9 +103,10 @@ class ReplayMemoryAWAC(ReplayMemory):
 
 
 class ReplayMemoryA2C(ReplayMemory):
-    def __init__(self, max_size):
+    def __init__(self, max_size, discrete_obs = None):
         super().__init__(max_size)
         self.sliceinds = None
+        self.discrete_obs = discrete_obs
 
     def sample(self, batch_size):
         assert self.sliceinds is not None
@@ -114,11 +115,21 @@ class ReplayMemoryA2C(ReplayMemory):
         else:
             indices = sample(range(self.size), batch_size)
         data = torch.vstack([self.buffer[index] for index in indices])
+        data_tuple = self.online_process(data)
+        return data_tuple
+
+    def online_process(self, data):
         s = data[:, self.sliceinds[0][0]:self.sliceinds[0][1]]  # (Nsamp, obs_dim)
         a = data[:, self.sliceinds[1][0]:self.sliceinds[1][1]].to(torch.int64)  # (Nsamp, 1)
         G = data[:, self.sliceinds[2][0]:self.sliceinds[2][1]]  # (Nsamp, 1)
-        data_tuple = (s, a, G)
+
+        if self.discrete_obs:
+            s2 = torch.nn.functional.one_hot(s.to(torch.int64), num_classes=self.discrete_obs).squeeze()  # (Nsamp, obs_classes) int64
+            data_tuple = (s2.to(torch.float32), a, G)
+        else:
+            data_tuple = (s, a, G)
         return data_tuple
+
 
     def specify_data_tuple(self, s: Tuple[int, int], a: Tuple[int, int], G: Tuple[int, int]):
         self.sliceinds = (s, a, G)
