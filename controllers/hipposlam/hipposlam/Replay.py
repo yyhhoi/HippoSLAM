@@ -103,7 +103,7 @@ class ReplayMemoryAWAC(ReplayMemory):
 
 
 class ReplayMemoryA2C(ReplayMemory):
-    def __init__(self, max_size, discrete_obs = None):
+    def __init__(self, max_size=10000, discrete_obs = None):
         super().__init__(max_size)
         self.sliceinds = None
         self.discrete_obs = discrete_obs

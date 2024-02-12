@@ -40,9 +40,9 @@ class BreakRoom(Supervisor, gym.Env):
         # Environment specific
         self.__timestep = int(self.getBasicTimeStep())  # default 32ms
         self.thetastep = self.__timestep * 32  # 32 * 32 = 1024 ms
+        self.r_bonus_counts = [0] * 4
 
         # Distance sensor
-
         if self.use_ds:
             self.ds = []
             self.ds = self.getDevice('ds2')  # Front sensor
@@ -82,7 +82,7 @@ class BreakRoom(Supervisor, gym.Env):
         self.simulationResetPhysics()
         self.simulationReset()
         super().step(self.__timestep)
-
+        self.r_bonus_counts = [0] * 4
         self.translation_field = self.supervis.getField('translation')
         self.rotation_field = self.supervis.getField('rotation')
 
@@ -118,13 +118,15 @@ class BreakRoom(Supervisor, gym.Env):
         new_x, new_y, new_z = self._get_translation()
         rotx, roty, rotz, rota = self._get_rotation()
 
+        r_bonus = self._get_intermediate_reward(new_x, new_y)
+
         # Win condition
         win = self._check_goal(new_x, new_y)
         if win:
             print('\n================== Robot has reached the goal =================================\n')
             reward, done = 1, True
         else:
-            reward, done = 0, False
+            reward, done = 0 + r_bonus, False
 
 
         # Stuck detection
@@ -188,6 +190,29 @@ class BreakRoom(Supervisor, gym.Env):
         else:
             raise ValueError()
         return win
+
+    def _get_intermediate_reward(self, x, y):
+        r_bonus = 0
+        if (y < -1.2) and (self.r_bonus_counts[0]<1):
+            r_bonus = 0.1
+            self.r_bonus_counts[0] += 1
+
+        if (x < 2) and (self.r_bonus_counts[1]<1):
+            r_bonus = 0.3
+            self.r_bonus_counts[1] += 1
+
+        if (x < 2) and (y > 1.3) and (self.r_bonus_counts[2]<1):
+            r_bonus = 0.5
+            self.r_bonus_counts[2] += 1
+
+        if (x < -3.3) and (self.r_bonus_counts[3]<1):
+            r_bonus = 0.7
+            self.r_bonus_counts[3] += 1
+
+        if r_bonus > 0:
+            print('Partial goal arrived! R bonus = %0.2f'%(r_bonus))
+        return r_bonus
+
 
     def _spawn(self):
         if self.spawn_mode == 'start':

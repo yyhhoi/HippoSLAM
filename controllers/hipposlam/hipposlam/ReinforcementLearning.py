@@ -38,12 +38,16 @@ def compute_discounted_returns(r, end, q_val, gamma=0.99):
 class A2C(nn.Module):
     def __init__(self, critic,
                         actor,
+                        critic_target=None,
                         gamma=0.99,
                         critic_lr=1e-3,
                         actor_lr=1e-3,
                         weight_decay=0):
         super(A2C, self).__init__()
         self.critic = critic
+        self.critic_target = critic_target
+        if self.critic_target:
+            self.critic_target.load_state_dict(critic.state_dict())
         self.critic_opt = torch.optim.Adam(params=self.critic.parameters(), lr=critic_lr, weight_decay=weight_decay)
         self.actor = actor
         self.actor_opt = torch.optim.Adam(params=self.actor.parameters(), lr=actor_lr, weight_decay=weight_decay)
@@ -51,20 +55,31 @@ class A2C(nn.Module):
 
 
 
-    def get_action(self, state, num_samples: int = 1):
+    def get_action(self, state):
+        """
+
+        Parameters
+        ----------
+        state : Tensor (N, obs_dim) torch.float32
+
+        Returns
+        -------
+        Action : Tensor (N, 1) torch.int64
+
+        """
+
         with torch.no_grad():
             logits = self.actor(state)  # (N, obs_dim) -> (N, act_dim)
             dist = Categorical(logits=logits)
-            return dist.sample(sample_shape=[num_samples]).T  # -> (N, 1)
+            return dist.sample(sample_shape=[1]).T  # -> (N, 1)
 
     def update_networks(self, state, action, G):
         """
         Parameters
         ----------
-        state : torch.tensor. (N, obs_dim). torch.float32
-        action : torch.tensor. (N, act_dim). torch.float32
-        G : torch.tensor. (N, ). torch.float32
-            Return. Approximation of the action values sampled by policy.
+        state : Tensor. (N, obs_dim). torch.float32
+        action : Tensor. (N, 1). torch.int64
+        G : torch.tensor. (N, 1). torch.float32
         """
 
         critic_loss = self.update_critic(state, G)
@@ -72,26 +87,76 @@ class A2C(nn.Module):
         self.critic_opt.zero_grad()
         critic_loss.backward()
         self.critic_opt.step()
+        if self.critic_target:
+            soft_update(self.critic, self.critic_target, 5e-3)
         self.actor_opt.zero_grad()
         actor_loss.backward()
         self.actor_opt.step()
         return critic_loss, actor_loss
 
     def update_critic(self, state, G):
+        """
+
+        Parameters
+        ----------
+        state : Tensor. (N, obs_dim). torch.float32
+        action : Tensor. (N, 1). torch.int64
+
+        Returns
+        -------
+        loss : Tensor. Scalar
+        """
         v = self.critic(state)  # -> (N, 1) float
         A = G - v  # -> (N, 1)
         critic_loss = torch.sum(torch.square(A))  # -> scalar
         return critic_loss
 
     def update_actor(self, state, action, G):
+        """
+
+        Parameters
+        ----------
+        state : Tensor. (N, obs_dim). torch.float32
+        action : Tensor. (N, 1). torch.int64
+        G : torch.tensor. (N, 1). torch.float32
+
+        Returns
+        -------
+        loss : Tensor. Scalar
+        """
+
         logits = self.actor(state)  # (N, obs_dim) -> (N, act_dim)
         log_prob = Categorical(logits=logits).log_prob(action.squeeze()).view(-1, 1)  # -> (N, 1)
         with torch.no_grad():
-            v = self.critic(state)  # -> (N, 1) float
+            if self.critic_target:
+                v = self.critic_target(state)  # -> (N, 1) float
+            else:
+                v = self.critic(state)  # -> (N, 1) float
             A = G - v  # -> (N, 1)
         loss = (log_prob * A).mean() * -1  # -> scalar
         return loss
 
+    def save_checkpoint(self, pth):
+        ckpt_dict = {
+            'critic_state_dict': self.critic.state_dict(),
+            'actor_state_dict': self.actor.state_dict(),
+            'critic_opt_state_dict': self.critic_opt.state_dict(),
+            'actor_opt_state_dict': self.actor_opt.state_dict(),
+            'gamma': self.gamma,
+        }
+        if self.critic_target:
+            ckpt_dict['critic_target_state_dict'] = self.critic_target.state_dict()
+        torch.save(ckpt_dict, pth)
+
+    def load_checkpoint(self, pth):
+        checkpoint = torch.load(pth)
+        self.critic.load_state_dict(checkpoint['critic_state_dict'])
+        self.actor.load_state_dict(checkpoint['actor_state_dict'])
+        self.critic_opt.load_state_dict(checkpoint['critic_opt_state_dict'])
+        self.actor_opt.load_state_dict(checkpoint['actor_opt_state_dict'])
+        self.gamma = checkpoint['gamma']
+        if self.critic_target:
+            self.critic_target.load_state_dict(checkpoint['critic_target_state_dict'])
 
 
 
