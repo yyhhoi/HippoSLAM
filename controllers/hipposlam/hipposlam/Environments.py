@@ -3,7 +3,7 @@ from pprint import PrettyPrinter
 import numpy as np
 
 from controller import Supervisor
-import gym
+import gymnasium as gym
 
 from .Sequences import Sequences, StateDecoder
 from .utils import save_pickle, read_pickle
@@ -41,6 +41,8 @@ class BreakRoom(Supervisor, gym.Env):
         self.__timestep = int(self.getBasicTimeStep())  # default 32ms
         self.thetastep = self.__timestep * 32  # 32 * 32 = 1024 ms
         self.r_bonus_counts = [0] * 4
+        self.t = 0  # reset to 0, +1 every time self.step() is called
+        self.maxt = max_episode_steps
 
         # Distance sensor
         if self.use_ds:
@@ -77,18 +79,24 @@ class BreakRoom(Supervisor, gym.Env):
         obs = np.array([new_x, new_y, rotx, roty, cosa, sina])
         return obs
 
+    def steptime(self):
+        super().step(self.__timestep)
+
     def reset(self):
         # Reset the simulation
         self.simulationResetPhysics()
         self.simulationReset()
         super().step(self.__timestep)
+
+        # Reset attributes
+        self.stuck_m = 0
+        self.t = 0
         self.r_bonus_counts = [0] * 4
         self.translation_field = self.supervis.getField('translation')
         self.rotation_field = self.supervis.getField('rotation')
 
         # Reset position and velocity
         x, y, a = self._spawn()
-        self.stuck_m = 0
         self._set_translation(x, y, 0.07)  # 4.18, 2.82, 0.07
         self._set_rotation(0, 0, -1, a)  # 0, 0, -1, 1.57
         super().step(self.__timestep*3)
@@ -103,7 +111,7 @@ class BreakRoom(Supervisor, gym.Env):
         # Internals
         super().step(self.__timestep)
 
-        return obs
+        return obs, {}
 
     def step(self, action):
 
@@ -112,7 +120,7 @@ class BreakRoom(Supervisor, gym.Env):
         self.leftMotor2.setVelocity(leftd)
         self.rightMotor1.setVelocity(rightd)
         self.rightMotor2.setVelocity(rightd)
-        out = super().step(self.thetastep)
+        super().step(self.thetastep)
 
 
         new_x, new_y, new_z = self._get_translation()
@@ -124,9 +132,9 @@ class BreakRoom(Supervisor, gym.Env):
         win = self._check_goal(new_x, new_y)
         if win:
             print('\n================== Robot has reached the goal =================================\n')
-            reward, done = 1, True
+            reward, terminated, truncated = 1, True, False
         else:
-            reward, done = 0 + r_bonus, False
+            reward, terminated, truncated = 0 + r_bonus, False, False
 
 
         # Stuck detection
@@ -142,16 +150,15 @@ class BreakRoom(Supervisor, gym.Env):
         if stuck:
             print("\n================== Robot is stuck =================================\n")
             print('stuck_m = %0.4f'%(self.stuck_m))
-            reward, done = 0, True
+            reward, terminated, truncated = 0, False, True
 
 
         # Fallen detection
         fallen = (np.abs(rotx) > 0.4) | (np.abs(roty) > 0.4)
         if fallen:
-            print('\n================== Robot has fallen %s=============================\n'%(str(fallen)))
+            print('\n================== Robot has fallen =============================\n')
             print('Rotations = %0.4f, %0.4f, %0.4f, %0.4f '%(rotx, roty, rotz, rota))
-            print('Abs x and y = %0.4f, %0.4f'%(np.abs(rotx), (np.abs(roty))))
-            reward, done = 0, True
+            reward, terminated, truncated = 0, False, True
             if self.fallen:
                 self.fallen_seq += 1
             if self.fallen_seq > 5:
@@ -160,8 +167,17 @@ class BreakRoom(Supervisor, gym.Env):
                 breakpoint()
         self.fallen = fallen
 
+        # Timelimit reached
+        timeout = self.t > self.maxt
+        if timeout:
+            print('\n================== Time out =============================')
+            reward, terminated, truncated = 0, False, True
+        self.t += 1
 
-        return self.get_obs(), reward, done, {'robot':out}
+        # Info
+        info = {'last_r': reward, 'terminated': int(terminated), 'truncated': int(truncated), 'stuck':int(stuck),
+                'fallen': int(fallen), 'timeout': int(timeout)}
+        return self.get_obs(), reward, terminated, truncated, info
 
 
     def init_wheels(self):
@@ -279,13 +295,19 @@ class StateMapLearner(BreakRoom):
         # print('Interred state = %d   / %d  , val = %0.2f'%(sid+1, self.hippomap.N, Snodes[sid]))
         return sid
 
-    def reset(self):
+    def reset(self, seed=None):
         obs = super(StateMapLearner, self).reset()
         # Reset hipposlam
         self.hipposeq.reset_activity()
         self.hippomap.reset()
+        self.t = 0
+        print('Hipposlam number of states = %d' % (self.hippomap.N))
         return obs
 
+    def step(self, action):
+        obs, reward, terminated, truncated, info = super(StateMapLearner, self).step(action)
+        info['Nstates'] = self.hippomap.N
+        return obs, reward, terminated, truncated, info
 
     def recognize_objects(self):
         objs = self.cam.getRecognitionObjects()

@@ -4,6 +4,10 @@ import numpy as np
 import torch
 from matplotlib import pyplot as plt
 from stable_baselines3 import PPO
+from stable_baselines3.common.evaluation import evaluate_policy
+from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.env_checker import check_env
+
 from torch import nn
 
 from hipposlam.Networks import MLP
@@ -17,32 +21,37 @@ os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 
 
-def StartSB():
+def SB_PPO_Train():
     # Modes
     load_model = True
     save_model = True
-    hippomap_learn = False
+    hippomap_learn = True
 
     # Paths
     save_dir = join('data', 'StateMapLearner')
-    load_model_name = 'PPO9_NoLearnMap'
-    save_model_name = 'PPO10_NoLearnMap'
+    load_model_name = 'PPO8'
+    save_model_name = 'PPO9'
     load_hipposlam_pth = join(save_dir, '%s_hipposlam.pickle' % load_model_name)
     load_model_pth = join(save_dir, '%s.zip'%(load_model_name))
     save_hipposlam_pth = join(save_dir, '%s_hipposlam.pickle' % save_model_name)
     save_model_pth = join(save_dir, '%s.zip' % (save_model_name))
+    save_record_pth = join(save_dir, '%s_TrainRecords.csv' % save_model_name)
 
     # Environment
-    env = StateMapLearner(spawn='start', goal='hard', max_hipposlam_states=500, use_ds=False)
-
+    env = StateMapLearner(spawn='start', goal='hard', max_episode_steps=500, max_hipposlam_states=500, use_ds=False)
+    info_keywords = ('Nstates', 'last_r', 'terminated', 'truncated', 'stuck', 'fallen', 'timeout')
+    env = Monitor(env, save_record_pth, info_keywords=info_keywords)
+    check_env(env)
 
     # Load models
     if load_model:
-        env.load_hipposlam(load_hipposlam_pth)
-        env.hippomap.learn_mode = hippomap_learn
+        env.unwrapped.load_hipposlam(load_hipposlam_pth)
+        env.unwrapped.hippomap.learn_mode = hippomap_learn
+        print('Hipposamp learn mode = ', str(env.unwrapped.hippomap.learn_mode))
         print('Loading hippomap. There are %d states in the hippomap' % (env.hippomap.N))
         model = PPO.load(load_model_pth, env=env)
     else:
+        env = Monitor(env, save_record_pth, info_keywords=info_keywords)
         model = PPO("MlpPolicy", env, verbose=1)
 
     # Train
@@ -51,9 +60,50 @@ def StartSB():
     # Save models
     if save_model:
         model.save(save_model_pth)
-        env.save_hipposlam(save_hipposlam_pth)
+        env.unwrapped.save_hipposlam(save_hipposlam_pth)
 
     print('After training, there are %d states in the hippomap' % (env.hippomap.N))
+
+
+def SB_PPO_Eval():
+    # Modes
+    hippomap_learn = False
+
+    # Paths
+    save_dir = join('data', 'StateMapLearner')
+    load_model_name = 'PPO'
+    # load_model_name = 'PPO11_NoLearnMap'
+    load_hipposlam_pth = join(save_dir, '%s_hipposlam.pickle' % load_model_name)
+    load_model_pth = join(save_dir, '%s.zip'%(load_model_name))
+    save_record_pth = join(save_dir, '%s_EvalRecords.csv' % load_model_name)
+
+    # Environment
+    env = StateMapLearner(spawn='start', goal='hard', max_hipposlam_states=500, use_ds=False)
+
+
+    # Load models
+    env.load_hipposlam(load_hipposlam_pth)
+    env.hippomap.learn_mode = hippomap_learn
+    print('Loading hippomap. There are %d states in the hippomap' % (env.hippomap.N))
+
+    # Monitor
+    env = Monitor(env, save_record_pth, info_keywords=('last_r',))
+
+    # RL model
+    model = PPO.load(load_model_pth, env=env)
+
+    # Eval
+    vec_env = model.get_env()
+    obs = vec_env.reset()
+    for i in range(100):
+        while True:
+            action, _states = model.predict(obs, deterministic=True)
+            obs, rewards, done, info = vec_env.step(action)
+
+            # Termination
+            if done:
+                print('Done')
+                break
 
 def OnlineA2C():
 
@@ -433,8 +483,8 @@ def main():
     # naive_avoidance()
     # evaluate_trained_model()
     # fine_tune_trained_model()
-    # bio_learning()
-    StartSB()
+    SB_PPO_Train()
+    # SB_PPO_Eval()
     return None
 
 if __name__ == '__main__':
