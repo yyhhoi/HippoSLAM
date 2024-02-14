@@ -28,9 +28,10 @@ def SB_PPO_Train():
     hippomap_learn = True
 
     # Paths
-    save_dir = join('data', 'StateMapLearner')
-    load_model_name = 'PPO8'
-    save_model_name = 'PPO9'
+    save_dir = join('data', 'StateMapLearner_R5L20')
+    os.makedirs(save_dir, exist_ok=True)
+    load_model_name = 'PPO3'
+    save_model_name = 'PPO4'
     load_hipposlam_pth = join(save_dir, '%s_hipposlam.pickle' % load_model_name)
     load_model_pth = join(save_dir, '%s.zip'%(load_model_name))
     save_hipposlam_pth = join(save_dir, '%s_hipposlam.pickle' % save_model_name)
@@ -38,7 +39,7 @@ def SB_PPO_Train():
     save_record_pth = join(save_dir, '%s_TrainRecords.csv' % save_model_name)
 
     # Environment
-    env = StateMapLearner(spawn='start', goal='hard', max_episode_steps=500, max_hipposlam_states=500, use_ds=False)
+    env = StateMapLearner(R=5, L=20, spawn='start', goal='hard', max_episode_steps=500, max_hipposlam_states=500, use_ds=False)
     info_keywords = ('Nstates', 'last_r', 'terminated', 'truncated', 'stuck', 'fallen', 'timeout')
     env = Monitor(env, save_record_pth, info_keywords=info_keywords)
     check_env(env)

@@ -128,11 +128,10 @@ class StateDecoder:
         self.current_F = 0
         self.current_Sid = 0  # Current ID of the state node
         self.current_Sval = 0
-        self.second_Sval = 0
         self.lowSThresh = 0.11
         self.J = MatrixJ(self.N, self.current_F,
                          self.K)  # MatrixJ mapping J.reshape(N, -1) @ X.flatten() = State vector
-        self.sid_special = []
+
     def learn(self, X):
         """
 
@@ -158,16 +157,13 @@ class StateDecoder:
             PreviousQuietIDs = np.where(PreviousQuietMask)[0]
             X_tag = np.any(X[PreviousQuietIDs, :] > 0)
 
-        if N_tag or (S_tag and X_tag):
+        if (N_tag & (Xarea > 1e-6)) or (S_tag and X_tag):
             # Create a new state node
             self.N = self.J.expand_N(1)
             # Associate X with the  N-th node
             X_norm = X / Xarea
             self.J.increment(X_norm, self.N - 1)
 
-            # Store data
-            if (S_tag and X_tag):
-                self.sid_special.append(self.N-1)
 
     def infer_state(self, X):
         # Extend self.J.mat to the shape of X
@@ -185,7 +181,7 @@ class StateDecoder:
             # print('Inference: X is zero')
             # if No feature nodes were observed, use the previous state as inferred result
             Snodes = np.zeros(self.N)
-            Snodes[self.current_Sid] = 0
+            # self.current_Sid = 0    # Comment this line to use the previous state as inference result
             self.current_Sval = 0
 
         else:
@@ -198,7 +194,6 @@ class StateDecoder:
                 self.current_Sval = np.max(Snodes)
 
         return self.current_Sid, Snodes
-
     def reset(self):
         self.current_Sid = 0  # Current ID of the state node
         self.current_Sval = 0
@@ -206,4 +201,7 @@ class StateDecoder:
     def reach_maximum(self):
         return self.N >= self.maxN
 
+    def update_decoder(self, newJmat):
+        self.J.mat = newJmat
+        self.N = newJmat.shape[0]
 

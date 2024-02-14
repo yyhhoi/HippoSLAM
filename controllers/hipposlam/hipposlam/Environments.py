@@ -266,7 +266,7 @@ class OmniscientLearner(BreakRoom):
         self.observation_space = gym.spaces.Box(lowBox, highBox, shape=(self.obs_dim,))
 
 class StateMapLearner(BreakRoom):
-    def __init__(self, max_episode_steps=1000, max_hipposlam_states=500, use_ds=True,  spawn='all', goal='hard'):
+    def __init__(self, R=5, L=10, max_episode_steps=1000, max_hipposlam_states=500, use_ds=True,  spawn='all', goal='hard'):
         super(StateMapLearner, self).__init__(max_episode_steps, use_ds, spawn, goal)
         self.observation_space = gym.spaces.Discrete(max_hipposlam_states)
 
@@ -281,9 +281,8 @@ class StateMapLearner(BreakRoom):
         # hippoSlam
         self.fpos_dict = dict()
         self.obj_dist = 2  # in meters
-        R, L = 5, 10
         self.hipposeq = Sequences(R=R, L=L, reobserve=False)
-        self.hippomap = StateDecoder(R, L, maxN=max_hipposlam_states)
+        self.hippomap = StateDecoder(R=R, L=L, maxN=max_hipposlam_states)
 
 
     def get_obs(self):
@@ -292,7 +291,7 @@ class StateMapLearner(BreakRoom):
         sid, Snodes = self.hippomap.infer_state(self.hipposeq.X)
         if (self.hippomap.reach_maximum() is False) and (self.hippomap.learn_mode):
             self.hippomap.learn(self.hipposeq.X)
-        # print('Interred state = %d   / %d  , val = %0.2f'%(sid+1, self.hippomap.N, Snodes[sid]))
+        print('Interred state = %d   / %d  , val = %0.2f'%(sid+1, self.hippomap.N, Snodes[sid]))
         return sid
 
     def reset(self, seed=None):
