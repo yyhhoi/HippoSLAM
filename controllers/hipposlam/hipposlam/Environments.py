@@ -10,7 +10,7 @@ from .utils import save_pickle, read_pickle
 
 
 class BreakRoom(Supervisor, gym.Env):
-    def __init__(self, max_episode_steps=300, use_ds=True,  spawn='all', goal='hard'):
+    def __init__(self, max_episode_steps=300, use_ds=True, use_bumper=False,  spawn='all', goal='hard'):
         super().__init__()
 
         # ====================== To be defined by child class ========================================
@@ -22,20 +22,7 @@ class BreakRoom(Supervisor, gym.Env):
         self.spawn_mode = spawn  # 'all' or 'start'
         self.goal_mode = goal  # 'easy' or 'hard'
         self.use_ds = use_ds
-
-        # Supervisor
-        self.supervis = self.getSelf()
-        self.translation_field = self.supervis.getField('translation')
-        self.rotation_field = self.supervis.getField('rotation')
-        self.fallen = False
-        self.fallen_seq = 0
-
-        # Self position
-        self.x, self.y = None, None
-        self.rotz, self.rota = None, None
-        self.stuck_m = 0
-        self.stuck_epsilon = 0.0001
-        self.stuck_thresh = 7.5
+        self.use_bumper = use_bumper
 
         # Environment specific
         self.__timestep = int(self.getBasicTimeStep())  # default 32ms
@@ -44,11 +31,31 @@ class BreakRoom(Supervisor, gym.Env):
         self.t = 0  # reset to 0, +1 every time self.step() is called
         self.maxt = max_episode_steps
 
-        # Distance sensor
+        # Supervisor
+        self.supervis = self.getSelf()
+        self.translation_field = self.supervis.getField('translation')
+        self.translation_field.enableSFTracking(self.__timestep*12)
+        self.rotation_field = self.supervis.getField('rotation')
+        self.rotation_field.enableSFTracking(self.__timestep * 12)
+        self.fallen = False
+        self.fallen_seq = 0
+        self.fallen_thresh = 0.4
+
+        # Self position
+        self.x, self.y = None, None
+        self.rotz, self.rota = None, None
+        self.stuck_m = 0
+        self.stuck_epsilon = 0.0001
+        self.stuck_thresh = 7.5
+
+        # Distance sensor or bumper
         if self.use_ds:
             self.ds = []
             self.ds = self.getDevice('ds2')  # Front sensor
             self.ds.enable(self.__timestep * 4)
+        if self.use_bumper:
+            self.bumper = self.getDevice('touchsensor_front')
+            self.bumper.enable(self.__timestep * 4)
 
         # Wheels
         self.leftMotor1 = self.getDevice('wheel1')
@@ -92,18 +99,13 @@ class BreakRoom(Supervisor, gym.Env):
         self.stuck_m = 0
         self.t = 0
         self.r_bonus_counts = [0] * 4
-        self.translation_field = self.supervis.getField('translation')
-        self.rotation_field = self.supervis.getField('rotation')
 
         # Reset position and velocity
-        x, y, a = self._spawn()
-        self._set_translation(x, y, 0.07)  # 4.18, 2.82, 0.07
-        self._set_rotation(0, 0, -1, a)  # 0, 0, -1, 1.57
-        super().step(self.__timestep*3)
-        x, y, _ = self._get_translation()
+        x, y, a = self._reset_pose()
         self.x, self.y = x, y
         self.rotz, self.rota = -1, a
         self.init_wheels()
+        super().step(self.__timestep * 5)
 
         # Infer the first step
         obs = self.get_obs()
@@ -138,7 +140,6 @@ class BreakRoom(Supervisor, gym.Env):
 
 
         # Stuck detection
-        # dpos = np.sqrt((new_x-self.x)**2 + (new_y - self.y)**2 + (rotz*rota - self.rotz*self.rota)**2)
         dpos = np.sqrt((new_x - self.x) ** 2 + (new_y - self.y) ** 2)
         stuck_count = dpos < self.stuck_epsilon
         self.stuck_m = 0.9 * self.stuck_m + stuck_count * 1.0
@@ -154,7 +155,7 @@ class BreakRoom(Supervisor, gym.Env):
 
 
         # Fallen detection
-        fallen = (np.abs(rotx) > 0.4) | (np.abs(roty) > 0.4)
+        fallen = (np.abs(rotx) > self.fallen_thresh) | (np.abs(roty) > self.fallen_thresh)
         if fallen:
             print('\n================== Robot has fallen =============================\n')
             print('Rotations = %0.4f, %0.4f, %0.4f, %0.4f '%(rotx, roty, rotz, rota))
@@ -254,8 +255,14 @@ class BreakRoom(Supervisor, gym.Env):
 
         else:
             raise ValueError()
-        return float(x), float(y), float(a)
+        z = 0.07
+        return float(x), float(y), z, float(a)
 
+    def _reset_pose(self):
+        x, y, z, a = self._spawn()
+        self._set_translation(x, y, z)  # 4.18, 2.82, 0.07
+        self._set_rotation(0, 0, -1, a)  # 0, 0, -1, 1.57
+        return x, y, a
 
 class OmniscientLearner(BreakRoom):
     def __init__(self, max_episode_steps=1000, use_ds=True,  spawn='all', goal='hard'):
@@ -266,8 +273,8 @@ class OmniscientLearner(BreakRoom):
         self.observation_space = gym.spaces.Box(lowBox, highBox, shape=(self.obs_dim,))
 
 class StateMapLearner(BreakRoom):
-    def __init__(self, R=5, L=10, max_episode_steps=1000, max_hipposlam_states=500, use_ds=True,  spawn='all', goal='hard'):
-        super(StateMapLearner, self).__init__(max_episode_steps, use_ds, spawn, goal)
+    def __init__(self, R=5, L=10, max_episode_steps=1000, max_hipposlam_states=500, use_ds=True, use_bumper=True, spawn='all', goal='hard'):
+        super(StateMapLearner, self).__init__(max_episode_steps, use_ds, use_bumper, spawn, goal)
         self.observation_space = gym.spaces.Discrete(max_hipposlam_states)
 
         # Camera
@@ -291,7 +298,7 @@ class StateMapLearner(BreakRoom):
         sid, Snodes = self.hippomap.infer_state(self.hipposeq.X)
         if (self.hippomap.reach_maximum() is False) and (self.hippomap.learn_mode):
             self.hippomap.learn(self.hipposeq.X)
-        print('Interred state = %d   / %d  , val = %0.2f'%(sid+1, self.hippomap.N, Snodes[sid]))
+        print('Interred state = %d   / %d  , val = %0.2f. F = %d, bumper=%d'%(sid+1, self.hippomap.N, Snodes[sid], self.hippomap.current_F, self.bumper.getValue()))
         return sid
 
     def reset(self, seed=None):
@@ -310,6 +317,11 @@ class StateMapLearner(BreakRoom):
 
     def recognize_objects(self):
         objs = self.cam.getRecognitionObjects()
+        if self.use_bumper:
+            bumped = self.bumper.getValue()
+        else:
+            bumped = 0
+
         idlist = [obj.getId() for obj in objs]
 
         # Distance from robot to the objects
@@ -340,7 +352,7 @@ class StateMapLearner(BreakRoom):
         id_list = []
         for c in closeIDlist:
             for f in farIDlist:
-                id_list.append(c+'_'+f)
+                id_list.append("%s_%s_%d"%(c, f, bumped))
 
         return id_list
 
@@ -351,3 +363,43 @@ class StateMapLearner(BreakRoom):
         hippodata = read_pickle(pth)
         self.hippomap = hippodata['hippomap']
         self.hipposeq = hippodata['hipposeq']
+
+
+
+
+class StateMapLearnerForest(StateMapLearner):
+    def __init__(self, R=5, L=10, max_episode_steps=1000, max_hipposlam_states=500, use_ds=True, use_bumper=True, spawn='all', goal='hard'):
+        super(StateMapLearnerForest, self).__init__(R, L, max_episode_steps, max_hipposlam_states, use_ds, use_bumper, spawn, goal)
+        self.fallen_thresh = 0.7
+        self.stuck_epsilon = 1e-3
+    def _check_goal(self, x, y):
+        if (x < -13) and (y < -6.8):
+            return True
+
+    def _get_intermediate_reward(self, x, y):
+        r_bonus = 0
+        if (x < -7) and (y < 4)and (self.r_bonus_counts[0]<1):
+            r_bonus = 0.3
+            self.r_bonus_counts[0] += 1
+        if (x < -3.1) and (y < 5.2)and (self.r_bonus_counts[1]<1):
+            r_bonus = 0.5
+            self.r_bonus_counts[1] += 1
+
+        if r_bonus > 0:
+            print('Partial goal arrived! R bonus = %0.2f'%(r_bonus))
+        return r_bonus
+
+    def _spawn(self):
+        # x, -15 - 7.5
+        # y, -0.5, 15
+        a = np.random.uniform(-np.pi, np.pi, size=1)
+        x = np.random.uniform(2.2, 4.2, size=1)
+        y = np.random.uniform(7, 9, size=1)
+        z = 0.1
+        return float(x), float(y), z, float(a)
+
+    def _reset_pose(self):
+        x, y, z, a = self._spawn()
+        self._set_translation(x, y, z)  # 4.18, 2.82, 0.07
+        self._set_rotation(0, 0, -1, a)  # 0, 0, -1, 1.57
+        return x, y, a

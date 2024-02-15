@@ -3,7 +3,11 @@
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/backgrounds/protos/TexturedBackground.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/appearances/protos/Grass.proto"
-EXTERNPROTO "../protos/Rock.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/garden/protos/DogHouse.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/trees/protos/Forest.proto"
+EXTERNPROTO "../protos/Cypress.proto"
+EXTERNPROTO "../protos/CypressSalient.proto"
+EXTERNPROTO "../protos/RockSalient.proto"
 
 WorldInfo {
   contactProperties [
@@ -16,25 +20,26 @@ WorldInfo {
   ]
 }
 Viewpoint {
-  orientation -0.2850202908409939 0.2036513169528923 0.9366373764228437 1.9620363120790136
-  position 12.431580416483968 -29.15964601173531 20.388909901407107
+  orientation 0.5357349987018263 -0.00825042351704133 -0.8443458661459435 3.167592092161044
+  position 20.871929776507457 8.044506679606194 48.454014264291935
 }
 TexturedBackground {
 }
 TexturedBackgroundLight {
 }
 DEF GROUND Solid {
+  translation 0.09 0 0
   children [
     DEF GROUND_SHAPE Group {
       children [
         Pose {
-          translation -8 -8 0
+          translation -15.98 -8 0
           children [
             Shape {
               appearance Grass {
                 type "mossy"
                 textureTransform TextureTransform {
-                  scale 8.5 8.5
+                  scale 20 20
                 }
               }
               geometry ElevationGrid {
@@ -42,7 +47,9 @@ DEF GROUND Solid {
                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.00734154, 0.277421, 0.254337, 0.270417, 0.174982, 0.171189, 0.2473, 0.240992, 0.152361, 0.110575, 0.0978332, 0.126226, 0.106899, 0.0670659, 0.00953075, 0, 0, 0.499106, 0.798685, 0.613379, 0.322475, 0.287311, 0.266366, 0.418124, 0.525612, 0.0265759, 0.30729, 0.0753625, 0.0480358, 0.0532171, 0.0870809, 0.0265759, 0, 0, 0.862448, 1.07618, 0.821001, 0.384595, 0.210389, 0.0983306, 0.331182, 0.347343, 0.263181, 0.13356, 0.0145599, 0.0762221, 0.100532, 0.243507, 0.159553, 0, 0, 0.75534, 0.984221, 0.864925, 0.447235, 0.0751634, 0.0222157, 0.078995, 0.102868, 0.0300013, 0.0114454, 0.00744961, 0.00984787, 0.204083, 0.520919, 0.461261, 0, 0, 0.362822, 0.603904, 0.566029, 0.340368, 0.102151, 0.0404528, 0.0668038, 0.00744951, 0.00933689, 0.0504858, 0.00744961, -0.000948593, 0.113054, 0.320988, 0.289012, 0, 0, 0.24704, 0.327251, 0.277966, 0.170757, 0.0771545, 0.0929641, 0.00744947, 0.00744951, 0.00744954, 0.00744958, 0.00744961, 0.0223858, 0.0165338, 0.0943175, 0.0460902, 0, 0, 0.205381, 0.266736, 0.119044, 0.124862, 0.0668763, 0.106241, 0.00744947, 0.00744951, 0.00744954, 0.00744958, 0.00744961, 0.00747269, 0.0113116, 0.0207513, 0.0670393, 0, 0, 0.131618, 0.109085, 0.0721561, 0.169558, 0.124192, 0.00986459, 0.00744947, 0.00744951, 0.00744954, 0.031045, 0.0443939, 0.00800915, 0.0184385, 0.0427789, 0.204962, 0, 0, 0.283209, 0.135281, 0.068453, 0.212608, 0.159615, 0.0361041, 0.00744947, 0.00744951, 0.0121282, 0.145762, 0.2493, 0.0458433, 0.0131252, 0.131277, 0.19891, 0, 0, 0.660028, 0.539195, 0.111397, 0.132591, 0.105425, 0.0289037, 0.00744947, 0.00744951, 0.00930376, 0.162809, 0.219176, 0.0290093, 0.0131459, 0.0436956, 0.0856175, 0, 0, 0.577927, 0.513154, 0.0907302, 0.0479889, 0.0704255, 0.019278, 0.00747491, 0.00932149, 0.0307641, 0.178685, 0.171126, 0.00346421, 0.0308989, 0.0948634, 0.262075, 0, 0, 0.315194, 0.205858, 0.0314991, 0.0365704, 0.127151, 0.142281, 0.00631048, 0.0559231, 0.196945, 0.333009, 0.17502, 0.00950381, 0.0639322, 0.243806, 0.282763, 0, 0, 0.233297, 0.177544, 0.0450179, 0.0682162, 0.129357, 0.0562887, 0.0190858, 0.120147, 0.389857, 0.381918, 0.0861915, -0.000387524, 0.178523, 0.482041, 0.357671, 0, 0, 0.00946765, 0.0925988, 0.208856, 0.242312, 0.359189, 0.320955, 0.189391, 0.194184, 0.352838, 0.288278, 0.142815, 0.143518, 0.27195, 0.517513, 0.504371, 0, 0, 0.037447, 0.126832, 0.314132, 0.26641, 0.227191, 0.16272, 0.107686, 0.12869, 0.0911368, 0.130659, 0.0368771, 0.108887, 0.0914181, 0.249301, 0.291638, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
                 ]
                 xDimension 17
+                xSpacing 1.5
                 yDimension 17
+                ySpacing 1.5
               }
               castShadows FALSE
             }
@@ -52,12 +59,497 @@ DEF GROUND Solid {
           appearance Grass {
             type "mossy"
             textureTransform TextureTransform {
-              scale 250 250
+              scale 100 100
             }
           }
           geometry Plane {
-            size 500 500
+            size 100 100
           }
+        }
+      ]
+    }
+    Pose {
+      children [
+        DEF WALLs Group {
+          children [
+            Solid {
+              translation -3.69 -8.28 0.470023
+              rotation 2.3464099999870814e-06 -2.3464099999870814e-06 0.9999999999944944 -1.5707953071795862
+              children [
+                DEF INVISIBLE_WALL Shape {
+                  appearance DEF TRANSPARENT PBRAppearance {
+                    transparency 1
+                    roughness 1
+                    metalness 0
+                  }
+                  geometry Box {
+                    size 0.02 25 0.9
+                  }
+                }
+              ]
+              name "invisible_wall"
+              boundingObject USE INVISIBLE_WALL
+            }
+            Solid {
+              translation 8.13 3.59 0.469965
+              rotation -2.343280460602283e-09 0.9774071921221089 0.21136504154655075 4.80123e-06
+              children [
+                DEF INVISIBLE_WALL Shape {
+                  appearance DEF TRANSPARENT PBRAppearance {
+                    transparency 1
+                    roughness 1
+                    metalness 0
+                  }
+                  geometry Box {
+                    size 0.02 25 0.9
+                  }
+                }
+              ]
+              name "invisible_wall(1)"
+              boundingObject USE INVISIBLE_WALL
+            }
+            Solid {
+              translation -4.26003 16.14 0.470023
+              rotation 2.3463799999870823e-06 2.3463799999870823e-06 0.9999999999944946 1.5708
+              children [
+                DEF INVISIBLE_WALL Shape {
+                  appearance DEF TRANSPARENT PBRAppearance {
+                    transparency 1
+                    roughness 1
+                    metalness 0
+                  }
+                  geometry Box {
+                    size 0.02 25 0.9
+                  }
+                }
+              ]
+              name "invisible_wall(2)"
+              boundingObject USE INVISIBLE_WALL
+            }
+            Solid {
+              translation -16.14 4.59 0.470075
+              rotation 2.346379999993541e-06 5.625329999984516e-15 0.9999999999972473 -3.1415853071795863
+              children [
+                DEF INVISIBLE_WALL Shape {
+                  appearance DEF TRANSPARENT PBRAppearance {
+                    transparency 1
+                    roughness 1
+                    metalness 0
+                  }
+                  geometry Box {
+                    size 0.02 25 0.9
+                  }
+                }
+              ]
+              name "invisible_wall(3)"
+              boundingObject USE INVISIBLE_WALL
+            }
+          ]
+        }
+        DEF SalientTrees Group {
+          children [
+            CypressSalient {
+              translation -0.72 8.94 0.34
+              name "cypress tree scale 2.5"
+              scale 2.5
+            }
+            CypressSalient {
+              translation -11.82 -3.05 1.49
+              name "cypress tree scale 2.5(1)"
+              scale 2.5
+            }
+            CypressSalient {
+              translation -12.36 -9.68 1.38
+              name "cypress tree scale 2.5(3)"
+              scale 2.5
+            }
+            CypressSalient {
+              translation -16.8 -6.75 1.38
+              name "cypress tree scale 2.5(2)"
+              scale 2.5
+            }
+            CypressSalient {
+              translation -0.41 -12.55 1.38
+              name "cypress tree scale 2.5(4)"
+              scale 2.5
+            }
+            CypressSalient {
+              translation 5.12 -5.26 0.15
+              name "cypress tree scale 2.5(5)"
+              scale 2.5
+            }
+            CypressSalient {
+              translation 11.16 -3.48 1.38
+              name "cypress tree scale 2.5(6)"
+              scale 2.5
+            }
+            CypressSalient {
+              translation -5.44 -10.59 1.38
+              name "cypress tree scale 2.5(8)"
+              scale 2.5
+            }
+            CypressSalient {
+              translation 4.39 -15.01 1.38
+              name "cypress tree scale 2.5(26)"
+              scale 2.5
+            }
+            CypressSalient {
+              translation 8.74 -9.84 1.38
+              name "cypress tree scale 2.5(27)"
+              scale 2.5
+            }
+            CypressSalient {
+              translation -20.8 6.86 1.38
+              name "cypress tree scale 2.5(28)"
+              scale 2.5
+            }
+            CypressSalient {
+              translation -13.33 18.16 1.38
+              name "cypress tree scale 2.5(29)"
+              scale 2.5
+            }
+            CypressSalient {
+              translation 10.63 5.32 1.38
+              name "cypress tree scale 2.5(9)"
+              scale 2.5
+            }
+            CypressSalient {
+              translation 9.99 13.95 0.04
+              name "cypress tree scale 2.5(10)"
+              scale 2.5
+            }
+            CypressSalient {
+              translation 9.67 17.47 0.06
+              name "cypress tree scale 2.5(11)"
+              scale 2.5
+            }
+            CypressSalient {
+              translation -8.15 16.83 1.38
+              name "cypress tree scale 2.5(12)"
+              scale 2.5
+            }
+            CypressSalient {
+              translation -2.67 12.5 0.32
+              name "cypress tree scale 2.5(25)"
+              scale 2.5
+            }
+            CypressSalient {
+              translation -0.38 17.92 1.38
+              name "cypress tree scale 2.5(13)"
+              scale 2.5
+            }
+            CypressSalient {
+              translation 3.76 18.39 1.38
+              name "cypress tree scale 2.5(14)"
+              scale 2.5
+            }
+            CypressSalient {
+              translation 5.36 13.01 0.52
+              name "cypress tree scale 2.5(24)"
+              scale 2.5
+            }
+            CypressSalient {
+              translation -6.97 -3.2 0.23
+              name "cypress tree scale 2.5(15)"
+              scale 2.5
+            }
+            CypressSalient {
+              translation -15.03 10.71 1.38
+              name "cypress tree scale 2.5(16)"
+              scale 2.5
+            }
+            CypressSalient {
+              translation -13.28 14.79 0.19
+              name "cypress tree scale 2.5(17)"
+              scale 2.5
+            }
+            CypressSalient {
+              translation -14.84 -1.99 1.05
+              name "cypress tree scale 2.5(19)"
+              scale 2.5
+            }
+            CypressSalient {
+              translation -14.8 3.22 1.38
+              name "cypress tree scale 2.5(18)"
+              scale 2.5
+            }
+            CypressSalient {
+              translation -0.12 -1.72 0.02
+              name "cypress tree scale 2.5(20)"
+              scale 2.5
+            }
+            CypressSalient {
+              translation -9.56 4.69 1.48
+              name "cypress tree scale 2.5(22)"
+              scale 2.5
+            }
+            CypressSalient {
+              translation 4.25 4.97 0.14
+              name "cypress tree scale 2.5(23)"
+              scale 2.5
+            }
+          ]
+        }
+        DEF SalientRocks Group {
+          children [
+            RockSalient {
+              translation -1.32 11.1 0.51
+              name "rock(1)"
+              scale 3
+            }
+            RockSalient {
+              translation -3.84 12.1 0.51
+              scale 6
+            }
+            RockSalient {
+              translation -4.74 10.25 0.42
+              rotation -0.4668220407596347 0.3582030312757826 0.8085590705977213 2.03099
+              name "rock(2)"
+              scale 6
+            }
+            RockSalient {
+              translation -3.67365 1.36321 0.29
+              rotation 0 0 1 -2.8797853071795863
+              name "rock(8)"
+              scale 6
+            }
+            RockSalient {
+              translation -4.2425 0.86735 0.34
+              rotation 0 0 1 0.785406
+              name "rock(9)"
+              scale 6
+            }
+            RockSalient {
+              translation -9.24184 7.77576 0.15
+              rotation 0 0 1 -2.356185307179586
+              name "rock(12)"
+              type "flat"
+              scale 2
+            }
+            RockSalient {
+              translation -10.4388 7.42476 0.14
+              rotation 0 0 -1 0.52359
+              name "rock(13)"
+              type "flat"
+              scale 4
+            }
+            RockSalient {
+              translation -4.835 1.91131 0.02
+              rotation 0 0 -1 -0.2618053071795865
+              name "rock(7)"
+              type "flat"
+              scale 6
+            }
+            RockSalient {
+              translation -5.87216 -6.07938 0.39
+              rotation 0 0 1 1.8326
+              name "rock(10)"
+              type "flat"
+              scale 6
+            }
+            RockSalient {
+              translation -10.5511 9.3181 0.17
+              rotation 0 0 1 -1.047195307179586
+              name "rock(11)"
+              type "flat"
+              scale 8
+            }
+            RockSalient {
+              translation -5.91344 11.074 0.37
+              rotation 0 0 1 1.8326
+              name "rock(3)"
+              scale 6
+            }
+            RockSalient {
+              translation -7.60742 13.287 0.29
+              rotation 0 0 -1 -5.307179586466759e-06
+              name "rock(4)"
+              type "flat"
+              scale 2
+            }
+            RockSalient {
+              translation -8.35737 14.228 0.27
+              rotation 0 0 1 1.0472
+              name "rock(5)"
+              type "flat"
+              scale 2
+            }
+          ]
+        }
+        DEF TREES Group {
+          children [
+            Cypress {
+              translation 3.44 -4.3 0.16
+              name "cypress tree(5)"
+            }
+            Cypress {
+              translation -13.95 -2.84 0.72
+              name "cypress tree(6)"
+            }
+            Cypress {
+              translation -6.3 -7.14 0.4
+              name "cypress tree(7)"
+            }
+            Cypress {
+              translation -6.46 -4.72 0.4
+              name "cypress tree(16)"
+            }
+            Cypress {
+              translation -6.36 -4.06 0.4
+              name "cypress tree(17)"
+            }
+            Cypress {
+              translation -5.17 -7.11 0.4
+              name "cypress tree(15)"
+            }
+            Cypress {
+              translation -5.73 -7.75 0.11
+              name "cypress tree(12)"
+              scale 1.5
+            }
+            Cypress {
+              translation -12.69 -2.61 0.99
+              name "cypress tree(13)"
+            }
+            Cypress {
+              translation 0.49 -2.52 0.03
+              name "cypress tree  scale 1"
+            }
+            Cypress {
+              translation 0.93 -0.88 0.02
+              name "cypress tree  scale 1(15)"
+            }
+            Cypress {
+              translation -0.06 -3.51 0.09
+              name "cypress tree  scale 1(16)"
+            }
+            Cypress {
+              translation 3.85 3.27 0.03
+              name "cypress tree  scale 1(1)"
+            }
+            Cypress {
+              translation 2.39 -3.06 0.25
+              name "cypress tree  scale 1(3)"
+            }
+            Cypress {
+              translation -13.37 -2.28 1.11
+              name "cypress tree  scale 1(4)"
+            }
+            Cypress {
+              translation -8.39 14.99 0.22
+              name "cypress tree  scale 1(6)"
+            }
+            Cypress {
+              translation -8.86 13.7 0
+              name "cypress tree  scale 1(19)"
+            }
+            Cypress {
+              translation -8.32 13.25 0
+              name "cypress tree  scale 1(20)"
+            }
+            Cypress {
+              translation -8.67 15.66 0.11
+              name "cypress tree  scale 1(7)"
+            }
+            Cypress {
+              translation -11.39 16.58 0
+              name "cypress tree  scale 1(8)"
+            }
+            Cypress {
+              translation -3.94 11.24 0.19
+              name "cypress tree  scale 1(9)"
+              scale 1.2
+            }
+            Cypress {
+              translation -0.82 10.2 0
+              name "cypress tree  scale 1(10)"
+            }
+            Cypress {
+              translation -5.64 10.22 0.05
+              name "cypress tree  scale 1(11)"
+              scale 1.4
+            }
+            Cypress {
+              translation -6.75 11.59 0.19
+              name "cypress tree  scale 1(17)"
+              scale 1.4
+            }
+            Cypress {
+              translation -7.23 12.57 0.34
+              name "cypress tree  scale 1(21)"
+              scale 1.4
+            }
+            Cypress {
+              translation -6.37 12.52 0.27
+              name "cypress tree  scale 1(22)"
+              scale 1.4
+            }
+            Cypress {
+              translation -4.08 9.79 0.09
+              name "cypress tree  scale 1(12)"
+            }
+            Cypress {
+              translation -1.15 10.65 0
+              name "cypress tree  scale 1(13)"
+            }
+            Cypress {
+              translation -1.94 11.23 0
+              name "cypress tree  scale 1(14)"
+              scale 1.3
+            }
+            Cypress {
+              translation -3.12 10.28 0.22
+              name "cypress tree  scale 1(18)"
+              scale 1.3
+            }
+          ]
+        }
+        Forest {
+          translation 0.85 -10.39 0
+          shape [
+            -50 0
+            50 0
+            0 25
+          ]
+          density 0.1
+          type "cherry tree"
+          groundTexture []
+        }
+        Forest {
+          translation 11.62 7.45 0
+          rotation 0 0 1 1.5708
+          shape [
+            -20 0
+            50 0
+            0 25
+          ]
+          density 0.1
+          type "cherry tree"
+          groundTexture []
+        }
+        Forest {
+          translation -3.65997 18.86 0
+          rotation 0 0 1 -3.1415853071795863
+          shape [
+            -20 0
+            20 0
+            0 25
+          ]
+          density 0.1
+          type "cherry tree"
+          groundTexture []
+        }
+        Forest {
+          translation -17.1086 12.3924 0
+          rotation 0 0 1 -1.5707953071795862
+          shape [
+            -20 0
+            20 0
+            0 25
+          ]
+          density 0.1
+          type "cherry tree"
+          groundTexture []
         }
       ]
     }
@@ -67,96 +559,23 @@ DEF GROUND Solid {
     0 0 0
   ]
 }
-Rock {
-  translation 8.24 0 0
-  name "rock(1)"
-  scale 7
-}
-Rock {
-  translation 4.43 2.15 0
-  name "rock(7)"
-  type "flat"
-  scale 3
-}
-Rock {
-  translation 6.89 0 0
-  name "rock(2)"
-  scale 7
-}
-Rock {
-  translation 3.87 0 0
-  name "rock(3)"
-  scale 7
-}
-Rock {
-  translation 8.24 4.29 0
-  name "rock(4)"
-  scale 7
-}
-Rock {
-  translation 2.83 3.93 0
-  name "rock(5)"
-  scale 7
-}
-Rock {
-  translation 9.76 1.61 0
-  name "rock(6)"
-  scale 7
-}
-Rock {
-  translation -0.866326 -1.02326 0
-  rotation 0 0 1 1.5708
-}
-Rock {
-  translation -0.212539 1.7806 -0.037219
-  rotation 0 1 0 0.0980463
-  name "rock (1)"
-  type "flat"
-}
-Rock {
-  translation 0.814429 0.889895 0
-  rotation 0 0 1 1.309
-  name "rock (2)"
-  type "flat"
-}
-Rock {
-  translation -2.2847 2.36097 0
-  rotation -0.1325999849101226 0.1325999849101226 0.9822598882188313 -1.5886953071795862
-  name "rock (3)"
-  type "flat"
-}
-Rock {
-  translation -2.19116 0.215003 0
-  rotation 0 0 1 1.5708
-  name "rock (4)"
-  type "flat"
+DogHouse {
+  translation -14.87 -7.38 0.11
 }
 DEF AGENT Robot {
-  translation -0.73999 -2.07993 0.07
+  translation 3.54 7.95004 0.11
   rotation 0 0 -1 1.5708
   children [
     TouchSensor {
-      translation 0.01 0 0.75
+      translation 0.153 0 0
       children [
         DEF TOUCHSENSOR_BODY Shape {
           geometry Box {
-            size 0.005 0.02 1.5
+            size 0.005 0.2 0.05
           }
         }
       ]
       name "touchsensor_front"
-      boundingObject USE TOUCHSENSOR_BODY
-    }
-    TouchSensor {
-      translation -0.01 0 0.75
-      children [
-        DEF TOUCHSENSOR_BODY Shape {
-          geometry Box {
-            size 0.005 0.02 1.5
-          }
-        }
-      ]
-      name "touchsensor_back"
       boundingObject USE TOUCHSENSOR_BODY
     }
     HingeJoint {
@@ -171,8 +590,8 @@ DEF AGENT Robot {
         }
       ]
       endPoint DEF WHEEL4 Solid {
-        translation -0.09999999999999962 -0.10999999999999943 -0.019999999999999202
-        rotation 1 8.894557442709716e-14 -6.610077110998749e-14 1.570799999995947
+        translation -0.09999999999999962 -0.10999999999999943 -0.01999999999999918
+        rotation 1 2.309442793342547e-10 -2.3092167004437383e-10 1.5707999999958535
         children [
           DEF WHEEL Shape {
             appearance PBRAppearance {
@@ -204,8 +623,8 @@ DEF AGENT Robot {
         }
       ]
       endPoint DEF WHEEL3 Solid {
-        translation -0.10000000000000014 0.11000000000000032 -0.01999999999999954
-        rotation 1 3.674009605637143e-13 -3.4934493045054044e-14 1.5707999999965543
+        translation -0.10000000000000012 0.11000000000000032 -0.01999999999999944
+        rotation 1 1.291478750054109e-10 -1.2881352443040217e-10 1.5707999999964366
         children [
           DEF WHEEL Shape {
             appearance PBRAppearance {
@@ -237,8 +656,8 @@ DEF AGENT Robot {
         }
       ]
       endPoint DEF WHEEL2 Solid {
-        translation 0.10000000000000007 -0.10999999999999943 -0.02000000000000004
-        rotation 1 2.386536154089198e-14 -7.363720107025221e-14 1.5707999999964595
+        translation 0.10000000000000007 -0.10999999999999943 -0.019999999999999758
+        rotation 1 -6.495617580975602e-12 6.440585941369793e-12 1.5707999999963593
         children [
           DEF WHEEL Shape {
             appearance PBRAppearance {
@@ -270,8 +689,8 @@ DEF AGENT Robot {
         }
       ]
       endPoint DEF WHEEL1 Solid {
-        translation 0.09999999999999959 0.11000000000000032 -0.01999999999999981
-        rotation 1 4.3467929885512697e-13 -4.945782161436337e-15 1.5707999999958582
+        translation 0.09999999999999959 0.11000000000000032 -0.019999999999999678
+        rotation 1 4.331092092800895e-13 -3.061674671365505e-15 1.570799999995758
         children [
           DEF WHEEL Shape {
             appearance PBRAppearance {
@@ -342,7 +761,7 @@ DEF AGENT Robot {
       ]
     }
     DistanceSensor {
-      translation 0.145 0.05 0.03
+      translation 0.13634 0.045 0.03
       rotation 0 0 1 0.523599
       children [
         DEF DS_SHAPE Shape {
@@ -362,7 +781,7 @@ DEF AGENT Robot {
       aperture 2
     }
     DistanceSensor {
-      translation 0.145 0 0.03
+      translation 0.135 0 0.03
       children [
         DEF DS_SHAPE Shape {
           appearance PBRAppearance {
@@ -381,7 +800,7 @@ DEF AGENT Robot {
       aperture 2
     }
     DistanceSensor {
-      translation 0.145 -0.05 0.03
+      translation 0.13634 -0.045 0.03
       rotation 0 0 1 -0.523595307179586
       children [
         DEF DS_SHAPE Shape {

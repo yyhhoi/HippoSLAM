@@ -6,7 +6,7 @@
 # A rock with a flat underside.
 # template language: javascript
 
-PROTO Rock [
+PROTO RockSalient [
   field SFVec3f                     translation       0 0 0
   field SFRotation                  rotation          0 0 1 0
   field SFString                    name              "rock"
@@ -39,6 +39,7 @@ PROTO Rock [
   Solid {
     translation IS translation
     rotation IS rotation
+	recognitionColors 0.6 0 0
     children [
       Shape {
         appearance PBRAppearance {
