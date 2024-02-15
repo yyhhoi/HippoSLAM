@@ -23,15 +23,15 @@ os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 def SB_PPO_Train():
     # Modes
-    load_model = True
-    save_model = True
+    load_model = False
+    save_model = False
     hippomap_learn = True
 
     # Paths
     save_dir = join('data', 'StateMapLearner_R5L20')
     os.makedirs(save_dir, exist_ok=True)
-    load_model_name = 'PPO3'
-    save_model_name = 'PPO4'
+    load_model_name = ''
+    save_model_name = 'test'
     load_hipposlam_pth = join(save_dir, '%s_hipposlam.pickle' % load_model_name)
     load_model_pth = join(save_dir, '%s.zip'%(load_model_name))
     save_hipposlam_pth = join(save_dir, '%s_hipposlam.pickle' % save_model_name)
