@@ -83,13 +83,13 @@ class BreakRoom(Supervisor, gym.Env):
         rotx, roty, rotz, rota = self._get_rotation()
         norma = np.sign(rotz) * rota
         cosa, sina = np.cos(norma), np.sin(norma)
-        obs = np.array([new_x, new_y, rotx, roty, cosa, sina])
+        obs = np.array([new_x, new_y, rotx, roty, cosa, sina]).astype(np.float32)
         return obs
 
-    def steptime(self):
-        super().step(self.__timestep)
+    def steptime(self, mul=1):
+        super().step(self.__timestep * mul)
 
-    def reset(self):
+    def reset(self, seed=None):
         # Reset the simulation
         self.simulationResetPhysics()
         self.simulationReset()
@@ -118,6 +118,8 @@ class BreakRoom(Supervisor, gym.Env):
     def step(self, action):
 
         leftd, rightd = self._action_to_direction[action]
+        if self.use_bumper and (self.bumper.getValue() > 0):
+            leftd, rightd = 0, 0
         self.leftMotor1.setVelocity(leftd)
         self.leftMotor2.setVelocity(leftd)
         self.rightMotor1.setVelocity(rightd)
@@ -264,127 +266,25 @@ class BreakRoom(Supervisor, gym.Env):
         self._set_rotation(0, 0, -1, a)  # 0, 0, -1, 1.57
         return x, y, a
 
-class OmniscientLearner(BreakRoom):
-    def __init__(self, max_episode_steps=1000, use_ds=True,  spawn='all', goal='hard'):
-        super(OmniscientLearner, self).__init__(max_episode_steps, use_ds, spawn, goal)
-        lowBox = np.array([-7, -3, -1, -1, -1, -1], dtype=np.float32)
-        highBox = np.array([7,  5,  1,  1, 1, 1], dtype=np.float32)
-        self.obs_dim = 6
-        self.observation_space = gym.spaces.Box(lowBox, highBox, shape=(self.obs_dim,))
 
-class StateMapLearner(BreakRoom):
-    def __init__(self, R=5, L=10, max_episode_steps=1000, max_hipposlam_states=500, use_ds=True, use_bumper=True, spawn='all', goal='hard'):
-        super(StateMapLearner, self).__init__(max_episode_steps, use_ds, use_bumper, spawn, goal)
-        self.observation_space = gym.spaces.Discrete(max_hipposlam_states)
-
-        # Camera
-        self.camera_timestep = self.thetastep
-        self.cam = self.getDevice('camera')
-        self.cam.enable(self.camera_timestep)
-        self.cam.recognitionEnable(self.camera_timestep)
-        self.cam_width = self.cam.getWidth()
-        self.cam_height = self.cam.getHeight()
-
-        # hippoSlam
-        self.fpos_dict = dict()
-        self.obj_dist = 2  # in meters
-        self.hipposeq = Sequences(R=R, L=L, reobserve=False)
-        self.hippomap = StateDecoder(R=R, L=L, maxN=max_hipposlam_states)
-
-
-    def get_obs(self):
-        id_list = self.recognize_objects()
-        self.hipposeq.step(id_list)
-        sid, Snodes = self.hippomap.infer_state(self.hipposeq.X)
-        if (self.hippomap.reach_maximum() is False) and (self.hippomap.learn_mode):
-            self.hippomap.learn(self.hipposeq.X)
-        print('Interred state = %d   / %d  , val = %0.2f. F = %d, bumper=%d'%(sid+1, self.hippomap.N, Snodes[sid], self.hippomap.current_F, self.bumper.getValue()))
-        return sid
-
-    def reset(self, seed=None):
-        obs = super(StateMapLearner, self).reset()
-        # Reset hipposlam
-        self.hipposeq.reset_activity()
-        self.hippomap.reset()
-        self.t = 0
-        print('Hipposlam number of states = %d' % (self.hippomap.N))
-        return obs
-
-    def step(self, action):
-        obs, reward, terminated, truncated, info = super(StateMapLearner, self).step(action)
-        info['Nstates'] = self.hippomap.N
-        return obs, reward, terminated, truncated, info
-
-    def recognize_objects(self):
-        objs = self.cam.getRecognitionObjects()
-        if self.use_bumper:
-            bumped = self.bumper.getValue()
-        else:
-            bumped = 0
-
-        idlist = [obj.getId() for obj in objs]
-
-        # Distance from robot to the objects
-        x, y, z = self._get_translation()
-        closeIDlist = []
-        farIDlist = []
-        for objid in idlist:
-
-            # Obtain object position
-            obj_node = self.getFromId(objid)
-            objpos = obj_node.getPosition()
-
-            # Store object positions
-            if str(objid) not in self.fpos_dict:
-                fpos_key = '%d'%objid
-                self.fpos_dict[fpos_key] = objpos
-                # print('Insert Id=%s with position ' % (fpos_key), objpos)
-
-            # Compute distance
-            dist = np.sqrt((x - objpos[0]) ** 2 + (y - objpos[1])**2)
-
-            if dist < self.obj_dist:
-                # print('Close object %d added'%(objid))
-                closeIDlist.append('%d'%(objid))
-            else:
-                farIDlist.append('%d'%(objid))
-
-        id_list = []
-        for c in closeIDlist:
-            for f in farIDlist:
-                id_list.append("%s_%s_%d"%(c, f, bumped))
-
-        return id_list
-
-    def save_hipposlam(self, pth):
-        save_pickle(pth, dict(hipposeq=self.hipposeq, hippomap=self.hippomap))
-
-    def load_hipposlam(self, pth):
-        hippodata = read_pickle(pth)
-        self.hippomap = hippodata['hippomap']
-        self.hipposeq = hippodata['hipposeq']
-
-
-
-
-class StateMapLearnerForest(StateMapLearner):
-    def __init__(self, R=5, L=10, max_episode_steps=1000, max_hipposlam_states=500, use_ds=True, use_bumper=True, spawn='all', goal='hard'):
-        super(StateMapLearnerForest, self).__init__(R, L, max_episode_steps, max_hipposlam_states, use_ds, use_bumper, spawn, goal)
-        self.fallen_thresh = 0.7
-        self.stuck_epsilon = 1e-3
+class Forest(BreakRoom):
     def _check_goal(self, x, y):
         if (x < -13) and (y < -6.8):
             return True
 
     def _get_intermediate_reward(self, x, y):
         r_bonus = 0
-        if (x < -7) and (y < 4)and (self.r_bonus_counts[0]<1):
+
+        if (x < -3.1) and (y < 5.2) and (self.r_bonus_counts[0]<1):
             r_bonus = 0.3
             self.r_bonus_counts[0] += 1
-        if (x < -3.1) and (y < 5.2)and (self.r_bonus_counts[1]<1):
+
+        if (x < -7) and (y < 4) and (self.r_bonus_counts[1]<1):
             r_bonus = 0.5
             self.r_bonus_counts[1] += 1
-
+        if (x < -8.15) and (y < -3) and (self.r_bonus_counts[2]<1):
+            r_bonus = 0.7
+            self.r_bonus_counts[2] += 1
         if r_bonus > 0:
             print('Partial goal arrived! R bonus = %0.2f'%(r_bonus))
         return r_bonus
@@ -403,3 +303,175 @@ class StateMapLearnerForest(StateMapLearner):
         self._set_translation(x, y, z)  # 4.18, 2.82, 0.07
         self._set_rotation(0, 0, -1, a)  # 0, 0, -1, 1.57
         return x, y, a
+
+class OmniscientLearner(BreakRoom):
+    def __init__(self, max_episode_steps=1000, use_ds=True, use_bumper=True,  spawn='all', goal='hard'):
+        super(OmniscientLearner, self).__init__(max_episode_steps, use_ds, use_bumper, spawn, goal)
+        lowBox = np.array([-7, -3, -1, -1, -1, -1], dtype=np.float32)
+        highBox = np.array([7,  5,  1,  1, 1, 1], dtype=np.float32)
+        self.obs_dim = 6
+        self.observation_space = gym.spaces.Box(lowBox, highBox, shape=(self.obs_dim,))
+
+
+class OmniscientLearnerForest(Forest, OmniscientLearner):
+    def __init__(self, max_episode_steps=1000, use_ds=True, use_bumper=True,  spawn='all', goal='hard'):
+        super(OmniscientLearnerForest, self).__init__(max_episode_steps, use_ds, use_bumper, spawn, goal)
+        lowBox = np.array([-16.5, -8.7, -1, -1, -1, -1], dtype=np.float32)
+        highBox = np.array([8.7,  17,  1,  1, 1, 1], dtype=np.float32)
+        self.obs_dim = 6
+        self.observation_space = gym.spaces.Box(lowBox, highBox, shape=(self.obs_dim,))
+
+
+class StateMapLearner(BreakRoom):
+    def __init__(self, R=5, L=10, max_episode_steps=1000, max_hipposlam_states=500, use_ds=True, use_bumper=True, spawn='all', goal='hard'):
+        super(StateMapLearner, self).__init__(max_episode_steps, use_ds, use_bumper, spawn, goal)
+        self.observation_space = gym.spaces.Discrete(max_hipposlam_states)
+
+        # Camera
+        self.camera_timestep = self.thetastep
+        self.cam = self.getDevice('camera')
+        self.cam.enable(self.camera_timestep)
+        self.cam.recognitionEnable(self.camera_timestep)
+        self.cam_width = self.cam.getWidth()
+        self.cam_height = self.cam.getHeight()
+
+        # hippoSlam
+        self.fpos_dict = dict()
+        self.obj_dist = 3  # in meters
+        self.hipposeq = Sequences(R=R, L=L, reobserve=False)
+        self.hippomap = StateDecoder(R=R, L=L, maxN=max_hipposlam_states)
+
+
+    def get_obs(self):
+        id_list = self.recognize_objects()
+        self.hipposeq.step(id_list)
+        sid, Snodes = self.hippomap.infer_state(self.hipposeq.X)
+        if (self.hippomap.reach_maximum() is False) and (self.hippomap.learn_mode):
+            self.hippomap.learn(self.hipposeq.X)
+        print('Interred state = %d   / %d  , val = %0.2f. F = %d, bumper=%d'%(sid+1, self.hippomap.N, Snodes[sid], self.hippomap.current_F, self.bumper.getValue()))
+        return sid
+
+    def reset(self, seed=None):
+        # Reset the simulation
+        self.simulationResetPhysics()
+        self.simulationReset()
+        self.steptime()
+
+        # Reset attributes
+        self.stuck_m = 0
+        self.t = 0
+        self.r_bonus_counts = [0] * 4
+
+        # Reset position and velocity
+        x, y, a = self._reset_pose()
+        self.x, self.y = x, y
+        self.rotz, self.rota = -1, a
+        self.init_wheels()
+        self.steptime(5)
+
+        # Reset hipposlam
+        self.hipposeq.reset_activity()
+        self.hippomap.reset()
+        self.t = 0
+        print('HippoSLAM Num. states = %d. Num. Feature nodes = %d' % (self.hippomap.N, self.hippomap.current_F))
+
+        # Infer the first step
+        obs = self.get_obs()
+
+        # Internals
+        self.steptime()
+
+        return obs, {}
+
+
+    def step(self, action):
+        obs, reward, terminated, truncated, info = super(StateMapLearner, self).step(action)
+        info['Nstates'] = self.hippomap.N
+        return obs, reward, terminated, truncated, info
+
+    def recognize_objects(self):
+        objs = self.cam.getRecognitionObjects()
+        if self.use_bumper:
+            bumped = self.bumper.getValue()
+        else:
+            bumped = 0
+
+        idlist = [obj.getId() for obj in objs]
+
+        # Distance from robot to the objects
+        x, y, z = self._get_translation()
+        IDlist_out = []
+        dist_list = []
+        for objid in idlist:
+
+            # Obtain object position
+            obj_node = self.getFromId(objid)
+            objpos = obj_node.getPosition()
+
+            # Store object positions
+            if str(objid) not in self.fpos_dict:
+                fpos_key = '%d'%objid
+                self.fpos_dict[fpos_key] = objpos
+                # print('Insert Id=%s with position ' % (fpos_key), objpos)
+
+            # Compute distance
+            dist = np.sqrt((x - objpos[0]) ** 2 + (y - objpos[1])**2)
+            dist_list.append(dist)
+            if dist < 1:
+                IDlist_out.append('%d_t' % (objid))
+            elif (dist < self.obj_dist) and (dist > 1):
+                # print('Close object %d added'%(objid))
+                IDlist_out.append('%d_c'%(objid))
+            else:
+                IDlist_out.append('%d_f'%(objid))
+
+        # id_list = []
+        # for c in closeIDlist:
+        #     for f in farIDlist:
+        #         id_list.append("%s_%s_%d"%(c, f, bumped))
+
+        return IDlist_out
+
+    def save_hipposlam(self, pth):
+        save_pickle(pth, dict(hipposeq=self.hipposeq, hippomap=self.hippomap))
+
+    def load_hipposlam(self, pth):
+        hippodata = read_pickle(pth)
+        self.hippomap = hippodata['hippomap']
+        self.hipposeq = hippodata['hipposeq']
+
+
+
+
+
+
+
+class StateMapLearnerForest(StateMapLearner, Forest):
+    def __init__(self, R=5, L=10, max_episode_steps=1000, max_hipposlam_states=500, use_ds=True, use_bumper=True, spawn='all', goal='hard'):
+        super(StateMapLearnerForest, self).__init__(R, L, max_episode_steps, max_hipposlam_states, use_ds, use_bumper, spawn, goal)
+        self.fallen_thresh = 1
+        self.stuck_epsilon = 1e-3
+
+
+
+class StateMapLearnerForestSnodes(StateMapLearnerForest):
+    def __init__(self, R=5, L=10, max_episode_steps=1000, max_hipposlam_states=500, use_ds=True, use_bumper=True, spawn='all', goal='hard'):
+        super(StateMapLearnerForestSnodes, self).__init__(R, L, max_episode_steps, max_hipposlam_states, use_ds, use_bumper, spawn, goal)
+        self.obs_dim = max_hipposlam_states
+        lowBox = np.zeros(self.obs_dim).astype(np.float32)
+        highBox = np.ones(self.obs_dim).astype(np.float32)
+        self.observation_space = gym.spaces.Box(lowBox, highBox, shape=(self.obs_dim,))
+
+
+
+    def get_obs(self):
+        id_list = self.recognize_objects()
+        self.hipposeq.step(id_list)
+        sid, Snodes = self.hippomap.infer_state(self.hipposeq.X)
+        if (self.hippomap.reach_maximum() is False) and (self.hippomap.learn_mode):
+            self.hippomap.learn(self.hipposeq.X)
+        # print('Interred state = %d   / %d  , val = %0.2f. F = %d, bumper=%d'%(sid+1, self.hippomap.N, Snodes[sid], self.hippomap.current_F, self.bumper.getValue()))
+        Snodesvec = np.zeros(self.obs_dim).astype(np.float32)
+        Snodesvec[:len(Snodes)] = Snodes
+        return Snodesvec
+

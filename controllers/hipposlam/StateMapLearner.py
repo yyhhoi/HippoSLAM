@@ -14,7 +14,7 @@ from hipposlam.Networks import MLP
 from hipposlam.ReinforcementLearning import AWAC, A2C, compute_discounted_returns
 from hipposlam.Replay import ReplayMemoryAWAC, ReplayMemoryA2C
 from hipposlam.utils import breakroom_avoidance_policy, save_pickle, PerformanceRecorder, read_pickle
-from hipposlam.Environments import StateMapLearner, StateMapLearnerForest
+from hipposlam.Environments import StateMapLearner, StateMapLearnerForest, StateMapLearnerForestSnodes
 from os.path import join
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
@@ -28,10 +28,10 @@ def SB_PPO_Train():
     hippomap_learn = True
 
     # Paths
-    save_dir = join('data', 'StateMapLearnerForest_R5L20')
+    save_dir = join('data', 'StateMapLearnerForestSnodes_CloseFarTouch_L20')
     os.makedirs(save_dir, exist_ok=True)
-    load_model_name = 'PPO6'
-    save_model_name = 'PPO7'
+    load_model_name = 'PPO6_NoFall'
+    save_model_name = 'PPO7_NoFall'
     load_hipposlam_pth = join(save_dir, '%s_hipposlam.pickle' % load_model_name)
     load_model_pth = join(save_dir, '%s.zip'%(load_model_name))
     save_hipposlam_pth = join(save_dir, '%s_hipposlam.pickle' % save_model_name)
@@ -39,7 +39,7 @@ def SB_PPO_Train():
     save_record_pth = join(save_dir, '%s_TrainRecords.csv' % save_model_name)
 
     # Environment
-    env = StateMapLearnerForest(R=5, L=20, spawn='start', goal='hard', max_episode_steps=500, max_hipposlam_states=500, use_ds=False, use_bumper=True)
+    env = StateMapLearnerForestSnodes(R=5, L=20, spawn='start', goal='hard', max_episode_steps=500, max_hipposlam_states=350, use_ds=False, use_bumper=True)
     info_keywords = ('Nstates', 'last_r', 'terminated', 'truncated', 'stuck', 'fallen', 'timeout')
     env = Monitor(env, save_record_pth, info_keywords=info_keywords)
     check_env(env)
@@ -52,7 +52,6 @@ def SB_PPO_Train():
         print('Loading hippomap. There are %d states in the hippomap' % (env.hippomap.N))
         model = PPO.load(load_model_pth, env=env)
     else:
-        env = Monitor(env, save_record_pth, info_keywords=info_keywords)
         model = PPO("MlpPolicy", env, verbose=1)
 
     # Train

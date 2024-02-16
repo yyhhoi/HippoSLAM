@@ -153,6 +153,8 @@ class StateDecoder:
         if N_tag:
             X_tag = True
         else:
+            # filtermask = self.J.mat[self.current_Sid, :, :] < 1e-6
+            # X_tag = np.any(X[filtermask]) > 0
             PreviousQuietMask = self.J.mat[self.current_Sid, :, :].sum(axis=1) < 1e-6
             PreviousQuietIDs = np.where(PreviousQuietMask)[0]
             X_tag = np.any(X[PreviousQuietIDs, :] > 0)

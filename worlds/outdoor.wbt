@@ -20,8 +20,8 @@ WorldInfo {
   ]
 }
 Viewpoint {
-  orientation 0.5357349987018263 -0.00825042351704133 -0.8443458661459435 3.167592092161044
-  position 20.871929776507457 8.044506679606194 48.454014264291935
+  orientation 0.5937469633670693 0.0030949039067311467 -0.804645863136195 3.1067162614049066
+  position 11.602529877092685 5.848010195417626 51.383909132590524
 }
 TexturedBackground {
 }
@@ -154,72 +154,72 @@ DEF GROUND Solid {
               scale 2.5
             }
             CypressSalient {
-              translation -11.82 -3.05 1.49
+              translation -11.82 -3.05 0.93
               name "cypress tree scale 2.5(1)"
               scale 2.5
             }
             CypressSalient {
-              translation -12.36 -9.68 1.38
+              translation -12.36 -9.4 0.04
               name "cypress tree scale 2.5(3)"
               scale 2.5
             }
             CypressSalient {
-              translation -16.8 -6.75 1.38
+              translation -17.51 -6.75 0.06
               name "cypress tree scale 2.5(2)"
               scale 2.5
             }
             CypressSalient {
-              translation -0.41 -12.55 1.38
+              translation 0.65 -9.02 1.38
               name "cypress tree scale 2.5(4)"
               scale 2.5
             }
             CypressSalient {
-              translation 5.12 -5.26 0.15
+              translation 5.12 -5.26 0.06
               name "cypress tree scale 2.5(5)"
               scale 2.5
             }
             CypressSalient {
-              translation 11.16 -3.48 1.38
+              translation 9.27 -3.48 0.09
               name "cypress tree scale 2.5(6)"
               scale 2.5
             }
             CypressSalient {
-              translation -5.44 -10.59 1.38
+              translation -8.37 -9.2 0.06
               name "cypress tree scale 2.5(8)"
               scale 2.5
             }
             CypressSalient {
-              translation 4.39 -15.01 1.38
+              translation 7.15 -0.39 1.38
               name "cypress tree scale 2.5(26)"
               scale 2.5
             }
             CypressSalient {
-              translation 8.74 -9.84 1.38
+              translation 7.18 -9.22 0.05
               name "cypress tree scale 2.5(27)"
               scale 2.5
             }
             CypressSalient {
-              translation -20.8 6.86 1.38
+              translation -1.12 4.08 0.13
               name "cypress tree scale 2.5(28)"
               scale 2.5
             }
             CypressSalient {
-              translation -13.33 18.16 1.38
+              translation -12.89 5.82 0.17
               name "cypress tree scale 2.5(29)"
               scale 2.5
             }
             CypressSalient {
-              translation 10.63 5.32 1.38
+              translation 9.18 5.32 0.1
               name "cypress tree scale 2.5(9)"
               scale 2.5
             }
             CypressSalient {
-              translation 9.99 13.95 0.04
+              translation 9.03 13.95 0.04
               name "cypress tree scale 2.5(10)"
               scale 2.5
             }
             CypressSalient {
-              translation 9.67 17.47 0.06
+              translation -1.82 -6.49 0.06
               name "cypress tree scale 2.5(11)"
               scale 2.5
             }
@@ -234,18 +234,28 @@ DEF GROUND Solid {
               scale 2.5
             }
             CypressSalient {
-              translation -0.38 17.92 1.38
+              translation -0.38 17.06 1.38
               name "cypress tree scale 2.5(13)"
               scale 2.5
             }
             CypressSalient {
-              translation 3.76 18.39 1.38
+              translation 3.76 17.21 0.06
               name "cypress tree scale 2.5(14)"
               scale 2.5
             }
             CypressSalient {
-              translation 5.36 13.01 0.52
+              translation 6.06 10.7 0.52
               name "cypress tree scale 2.5(24)"
+              scale 2.5
+            }
+            CypressSalient {
+              translation 1.72 13.36 0.52
+              name "cypress tree scale 2.5(21)"
+              scale 2.5
+            }
+            CypressSalient {
+              translation -5.94 5.23 0.52
+              name "cypress tree scale 2.5(7)"
               scale 2.5
             }
             CypressSalient {
@@ -279,7 +289,7 @@ DEF GROUND Solid {
               scale 2.5
             }
             CypressSalient {
-              translation -9.56 4.69 1.48
+              translation -9.56 2.12 0.11
               name "cypress tree scale 2.5(22)"
               scale 2.5
             }
@@ -590,8 +600,8 @@ DEF AGENT Robot {
         }
       ]
       endPoint DEF WHEEL4 Solid {
-        translation -0.09999999999999962 -0.10999999999999943 -0.01999999999999918
-        rotation 1 2.309442793342547e-10 -2.3092167004437383e-10 1.5707999999958535
+        translation -0.09999999999999962 -0.10999999999999943 -0.019999999999998866
+        rotation 1 2.2160738840604912e-10 -2.215974183372475e-10 1.5707999999955102
         children [
           DEF WHEEL Shape {
             appearance PBRAppearance {
@@ -623,8 +633,8 @@ DEF AGENT Robot {
         }
       ]
       endPoint DEF WHEEL3 Solid {
-        translation -0.10000000000000012 0.11000000000000032 -0.01999999999999944
-        rotation 1 1.291478750054109e-10 -1.2881352443040217e-10 1.5707999999964366
+        translation -0.10000000000000019 0.11000000000000032 -0.019999999999999348
+        rotation 1 2.2991222020430138e-10 -2.2958273690697526e-10 1.570799999996094
         children [
           DEF WHEEL Shape {
             appearance PBRAppearance {
@@ -656,8 +666,8 @@ DEF AGENT Robot {
         }
       ]
       endPoint DEF WHEEL2 Solid {
-        translation 0.10000000000000007 -0.10999999999999943 -0.019999999999999758
-        rotation 1 -6.495617580975602e-12 6.440585941369793e-12 1.5707999999963593
+        translation 0.10000000000000005 -0.10999999999999943 -0.01999999999999999
+        rotation 1 -6.481329765843654e-12 6.431871944229293e-12 1.570799999996024
         children [
           DEF WHEEL Shape {
             appearance PBRAppearance {
@@ -689,8 +699,8 @@ DEF AGENT Robot {
         }
       ]
       endPoint DEF WHEEL1 Solid {
-        translation 0.09999999999999959 0.11000000000000032 -0.019999999999999678
-        rotation 1 4.331092092800895e-13 -3.061674671365505e-15 1.570799999995758
+        translation 0.09999999999999962 0.11000000000000032 -0.01999999999999988
+        rotation 1 -1.8951711262620506e-10 1.8995108538475153e-10 1.5707999999954245
         children [
           DEF WHEEL Shape {
             appearance PBRAppearance {

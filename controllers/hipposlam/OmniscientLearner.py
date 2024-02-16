@@ -4,30 +4,53 @@ import numpy as np
 import torch
 from os.path import join
 
+
 from matplotlib import pyplot as plt
 
 from hipposlam.Replay import ReplayMemoryAWAC, ReplayMemoryA2C
 from hipposlam.utils import save_pickle, read_pickle, breakroom_avoidance_policy, PerformanceRecorder
 from hipposlam.Networks import MLP
 from hipposlam.ReinforcementLearning import AWAC, A2C, compute_discounted_returns
-from hipposlam.Environments import OmniscientLearner
+from hipposlam.Environments import OmniscientLearner, OmniscientLearnerForest
 from stable_baselines3 import PPO
+from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.env_checker import check_env
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
-def StartSB():
+def SB_PPO_Train():
     # Modes
-
+    load_model = True
+    save_model = True
 
     # Paths
-    save_dir = join('data', 'OmniscientLearner')
-    save_model_name = 'PPO'
+    save_dir = join('data', 'OmniscientLearnerForest')
+    os.makedirs(save_dir, exist_ok=True)
+    load_model_name = 'PPO4'
+    save_model_name = 'PPO5'
+    load_model_pth = join(save_dir, '%s.zip'%(load_model_name))
+    save_model_pth = join(save_dir, '%s.zip' % (save_model_name))
+    save_record_pth = join(save_dir, '%s_TrainRecords.csv' % save_model_name)
 
     # Environment
-    env = OmniscientLearner(spawn='start', goal='easy', use_ds=False)
+    env = OmniscientLearnerForest(spawn='start', goal='hard', max_episode_steps=500, use_ds=False, use_bumper=True)
+    info_keywords = ('last_r', 'terminated', 'truncated', 'stuck', 'fallen', 'timeout')
+    env = Monitor(env, save_record_pth, info_keywords=info_keywords)
+    check_env(env)
 
-    model = PPO("MlpPolicy", env, verbose=1)
+    # Load models
+    if load_model:
+        model = PPO.load(load_model_pth, env=env)
+    else:
+        model = PPO("MlpPolicy", env, verbose=1, )
+
+    # Train
     model.learn(total_timesteps=25000)
-    model.save("PPO_OmniscientLearner")
+
+    # Save models
+    if save_model:
+        model.save(save_model_pth)
+
+
 
 
 def StartOnlineA2C():
@@ -404,6 +427,6 @@ def main():
     # evaluate_trained_model()
     # fine_tune_trained_model()
     # StartOnlineA2C()
-    StartSB()
+    SB_PPO_Train()
 if __name__ == '__main__':
     main()
