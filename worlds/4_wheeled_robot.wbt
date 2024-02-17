@@ -106,8 +106,6 @@ Robot {
           }
         ]
         boundingObject USE WHEEL
-        physics DEF WHEEL_PH Physics {
-        }
       }
     }
     HingeJoint {
@@ -129,7 +127,6 @@ Robot {
         ]
         name "solid2"
         boundingObject USE WHEEL
-        physics USE WHEEL_PH
       }
     }
     HingeJoint {
@@ -151,7 +148,6 @@ Robot {
         ]
         name "solid3"
         boundingObject USE WHEEL
-        physics USE WHEEL_PH
       }
     }
     HingeJoint {
@@ -173,14 +169,9 @@ Robot {
         ]
         name "solid4"
         boundingObject USE WHEEL
-        physics USE WHEEL_PH
       }
     }
   ]
   boundingObject USE BODY
-  physics Physics {
-    density -1
-    mass 1
-  }
   controller "obstacle_avoidance"
 }

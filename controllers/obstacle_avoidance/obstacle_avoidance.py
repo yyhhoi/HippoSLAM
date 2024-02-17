@@ -1,40 +1,20 @@
-"""epuck_avoid_collision controller."""
-
-# You may need to import some classes of the controller module. Ex:
-#  from controller import Robot, Motor, DistanceSensor
 from controller import Robot
 
-# create the Robot instance.
+TIME_STEP = 64
 robot = Robot()
-timestep = int(robot.getBasicTimeStep())
 
-# Speeds
-MAX_SPEED = 6.28
-
-# Get wheels and Initialize wheel speed
 wheels = []
-wheelsNames = ['left wheel motor', 'right wheel motor']
-for name in wheelsNames:
-    wheels.append(robot.getDevice(name))
-for i in range(2):
+wheelsNames = ['wheel1', 'wheel2', 'wheel3', 'wheel4']
+for i in range(4):
+    wheels.append(robot.getDevice(wheelsNames[i]))
     wheels[i].setPosition(float('inf'))
-    wheels[i].setVelocity(0)
+    wheels[i].setVelocity(0.0)
+avoidObstacleCounter = 0
+while robot.step(TIME_STEP) != -1:
+    leftSpeed = 1.0
+    rightSpeed = 1.0
 
-
-# Main loop:
-# - perform simulation steps until Webots is stopping the controller
-a = 1
-v = 0
-dt = 32 * 1e-3
-while robot.step(timestep) != -1:
-
-    v += a * dt
-    print('timet', robot.getTime())
-    print('v = ', v)
-    for i in range(2):
-
-        wheels[i].setVelocity(v)
-        print('Velocity %d = %0.4f' % (i, wheels[i].getVelocity()))
-
-
-# Enter here exit cleanup code.
+    wheels[0].setVelocity(leftSpeed)
+    wheels[1].setVelocity(rightSpeed)
+    wheels[2].setVelocity(leftSpeed)
+    wheels[3].setVelocity(rightSpeed)

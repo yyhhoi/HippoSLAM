@@ -37,16 +37,18 @@ class BreakRoom(Supervisor, gym.Env):
         self.translation_field.enableSFTracking(self.__timestep*12)
         self.rotation_field = self.supervis.getField('rotation')
         self.rotation_field.enableSFTracking(self.__timestep * 12)
-        self.fallen = False
-        self.fallen_seq = 0
-        self.fallen_thresh = 0.4
+        self.supervis.enableContactPointsTracking(self.__timestep)
+
 
         # Self position
         self.x, self.y = None, None
         self.rotz, self.rota = None, None
         self.stuck_m = 0
         self.stuck_epsilon = 0.0001
-        self.stuck_thresh = 7.5
+        self.stuck_thresh = 10
+        self.fallen = False
+        self.fallen_seq = 0
+        self.fallen_thresh = 0.4
 
         # Distance sensor or bumper
         if self.use_ds:
@@ -239,10 +241,11 @@ class BreakRoom(Supervisor, gym.Env):
             x = np.random.uniform(3.45, 6.3, size=1)
             y = np.random.uniform(1.35, 3.85, size=1)
             a = np.random.uniform(-np.pi, np.pi, size=1)
+            z = 0.07
         elif self.spawn_mode == 'all':
             room = int(np.random.randint(0, 3))
             a = np.random.uniform(-np.pi, np.pi, size=1)
-
+            z = 0.03
             if room == 0:  # First room
                 x = np.random.uniform(3.45, 5.34, size=1)
                 y = np.random.uniform(-2.25, 4.60, size=1)
@@ -257,13 +260,13 @@ class BreakRoom(Supervisor, gym.Env):
 
         else:
             raise ValueError()
-        z = 0.07
         return float(x), float(y), z, float(a)
 
     def _reset_pose(self):
         x, y, z, a = self._spawn()
         self._set_translation(x, y, z)  # 4.18, 2.82, 0.07
         self._set_rotation(0, 0, -1, a)  # 0, 0, -1, 1.57
+
         return x, y, a
 
 
@@ -275,11 +278,11 @@ class Forest(BreakRoom):
     def _get_intermediate_reward(self, x, y):
         r_bonus = 0
 
-        if (x < -3.1) and (y < 5.2) and (self.r_bonus_counts[0]<1):
+        if (x < -7) and (y < 4) and (self.r_bonus_counts[0]<1):
             r_bonus = 0.3
             self.r_bonus_counts[0] += 1
 
-        if (x < -7) and (y < 4) and (self.r_bonus_counts[1]<1):
+        if (x < -7) and (y < -0.6) and (self.r_bonus_counts[1]<1):
             r_bonus = 0.5
             self.r_bonus_counts[1] += 1
         if (x < -8.15) and (y < -3) and (self.r_bonus_counts[2]<1):
@@ -292,17 +295,33 @@ class Forest(BreakRoom):
     def _spawn(self):
         # x, -15 - 7.5
         # y, -0.5, 15
+        if self.spawn_mode == "start":
+
+            x = np.random.uniform(2.2, 4.2, size=1)
+            y = np.random.uniform(7, 9, size=1)
+            z = 0.1
+        elif self.spawn_mode == "all":
+            pts = np.array([
+                (3.54, 7.95, 0.09),
+                (5.25, 14.7, 0.31),
+                (-4.48, 14.8, 0.16),
+                (3.54, 0.91, 0.1),
+                (0.04, -5.69, 0.15),
+                (-5.88, 0.2, 0.1),
+                (-5.34, 7.65, 0.07),
+                (-14.2, 13.1, 0.09)
+            ])
+            pti = np.random.choice(len(pts))
+            x, y, z = pts[pti]
+            pass
+
+        else:
+            raise ValueError('Spawn mode must be either "start" or "all".')
+
         a = np.random.uniform(-np.pi, np.pi, size=1)
-        x = np.random.uniform(2.2, 4.2, size=1)
-        y = np.random.uniform(7, 9, size=1)
-        z = 0.1
+
         return float(x), float(y), z, float(a)
 
-    def _reset_pose(self):
-        x, y, z, a = self._spawn()
-        self._set_translation(x, y, z)  # 4.18, 2.82, 0.07
-        self._set_rotation(0, 0, -1, a)  # 0, 0, -1, 1.57
-        return x, y, a
 
 class OmniscientLearner(BreakRoom):
     def __init__(self, max_episode_steps=1000, use_ds=True, use_bumper=True,  spawn='all', goal='hard'):
@@ -323,7 +342,7 @@ class OmniscientLearnerForest(Forest, OmniscientLearner):
 
 
 class StateMapLearner(BreakRoom):
-    def __init__(self, R=5, L=10, max_episode_steps=1000, max_hipposlam_states=500, use_ds=True, use_bumper=True, spawn='all', goal='hard'):
+    def __init__(self, R=5, L=10, max_episode_steps=1000, max_hipposlam_states=500, use_ds=True, use_bumper=True, spawn='all', goal='hard', infer_mode='Sum'):
         super(StateMapLearner, self).__init__(max_episode_steps, use_ds, use_bumper, spawn, goal)
         self.observation_space = gym.spaces.Discrete(max_hipposlam_states)
 
@@ -339,7 +358,7 @@ class StateMapLearner(BreakRoom):
         self.fpos_dict = dict()
         self.obj_dist = 3  # in meters
         self.hipposeq = Sequences(R=R, L=L, reobserve=False)
-        self.hippomap = StateDecoder(R=R, L=L, maxN=max_hipposlam_states)
+        self.hippomap = StateDecoder(R=R, L=L, maxN=max_hipposlam_states, infer_mode=infer_mode)
 
 
     def get_obs(self):
@@ -347,8 +366,8 @@ class StateMapLearner(BreakRoom):
         self.hipposeq.step(id_list)
         sid, Snodes = self.hippomap.infer_state(self.hipposeq.X)
         if (self.hippomap.reach_maximum() is False) and (self.hippomap.learn_mode):
-            self.hippomap.learn(self.hipposeq.X)
-        print('Interred state = %d   / %d  , val = %0.2f. F = %d, bumper=%d'%(sid+1, self.hippomap.N, Snodes[sid], self.hippomap.current_F, self.bumper.getValue()))
+            self.hippomap.learn2(self.hipposeq.X)
+        print('Interred state = %d   / %d  , val = %0.2f. F = %d, Xsum=%0.4f'%(sid+1, self.hippomap.N, Snodes[sid], self.hippomap.current_F, self.hipposeq.X.sum()))
         return sid
 
     def reset(self, seed=None):
@@ -447,16 +466,16 @@ class StateMapLearner(BreakRoom):
 
 
 class StateMapLearnerForest(StateMapLearner, Forest):
-    def __init__(self, R=5, L=10, max_episode_steps=1000, max_hipposlam_states=500, use_ds=True, use_bumper=True, spawn='all', goal='hard'):
-        super(StateMapLearnerForest, self).__init__(R, L, max_episode_steps, max_hipposlam_states, use_ds, use_bumper, spawn, goal)
+    def __init__(self, R=5, L=10, max_episode_steps=1000, max_hipposlam_states=500, use_ds=True, use_bumper=True, spawn='all', goal='hard', infer_mode='Sum'):
+        super(StateMapLearnerForest, self).__init__(R, L, max_episode_steps, max_hipposlam_states, use_ds, use_bumper, spawn, goal, infer_mode)
         self.fallen_thresh = 1
-        self.stuck_epsilon = 1e-3
+        self.stuck_epsilon = 1e-4
 
 
 
 class StateMapLearnerForestSnodes(StateMapLearnerForest):
-    def __init__(self, R=5, L=10, max_episode_steps=1000, max_hipposlam_states=500, use_ds=True, use_bumper=True, spawn='all', goal='hard'):
-        super(StateMapLearnerForestSnodes, self).__init__(R, L, max_episode_steps, max_hipposlam_states, use_ds, use_bumper, spawn, goal)
+    def __init__(self, R=5, L=10, max_episode_steps=1000, max_hipposlam_states=500, use_ds=True, use_bumper=True, spawn='all', goal='hard', infer_mode='Sum'):
+        super(StateMapLearnerForestSnodes, self).__init__(R, L, max_episode_steps, max_hipposlam_states, use_ds, use_bumper, spawn, goal, infer_mode)
         self.obs_dim = max_hipposlam_states
         lowBox = np.zeros(self.obs_dim).astype(np.float32)
         highBox = np.ones(self.obs_dim).astype(np.float32)
@@ -469,9 +488,10 @@ class StateMapLearnerForestSnodes(StateMapLearnerForest):
         self.hipposeq.step(id_list)
         sid, Snodes = self.hippomap.infer_state(self.hipposeq.X)
         if (self.hippomap.reach_maximum() is False) and (self.hippomap.learn_mode):
-            self.hippomap.learn(self.hipposeq.X)
-        # print('Interred state = %d   / %d  , val = %0.2f. F = %d, bumper=%d'%(sid+1, self.hippomap.N, Snodes[sid], self.hippomap.current_F, self.bumper.getValue()))
+            self.hippomap.learn2(self.hipposeq.X)
+        # print('Interred state = %d   / %d  , val = %0.2f. F = %d, Xsum=%0.4f'%(sid+1, self.hippomap.N, Snodes[sid], self.hippomap.current_F, self.hipposeq.X.sum()))
         Snodesvec = np.zeros(self.obs_dim).astype(np.float32)
         Snodesvec[:len(Snodes)] = Snodes
+
         return Snodesvec
 

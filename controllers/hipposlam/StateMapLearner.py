@@ -7,6 +7,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.env_checker import check_env
+from stable_baselines3.common.callbacks import CheckpointCallback
 
 from torch import nn
 
@@ -28,10 +29,10 @@ def SB_PPO_Train():
     hippomap_learn = True
 
     # Paths
-    save_dir = join('data', 'StateMapLearnerForestSnodes_CloseFarTouch_L20')
+    save_dir = join('data', 'StateMapLearnerForestSnodes_CloseFarTouch_L40_StartAll_NoXtag')
     os.makedirs(save_dir, exist_ok=True)
-    load_model_name = 'PPO6_NoFall'
-    save_model_name = 'PPO7_NoFall'
+    load_model_name = 'PPO4'
+    save_model_name = 'PPO5'
     load_hipposlam_pth = join(save_dir, '%s_hipposlam.pickle' % load_model_name)
     load_model_pth = join(save_dir, '%s.zip'%(load_model_name))
     save_hipposlam_pth = join(save_dir, '%s_hipposlam.pickle' % save_model_name)
@@ -39,10 +40,21 @@ def SB_PPO_Train():
     save_record_pth = join(save_dir, '%s_TrainRecords.csv' % save_model_name)
 
     # Environment
-    env = StateMapLearnerForestSnodes(R=5, L=20, spawn='start', goal='hard', max_episode_steps=500, max_hipposlam_states=350, use_ds=False, use_bumper=True)
+    env = StateMapLearnerForestSnodes(R=5, L=40, spawn='all', goal='hard', max_episode_steps=350,
+                                      max_hipposlam_states=500, use_ds=False, use_bumper=False, infer_mode='Sum')
     info_keywords = ('Nstates', 'last_r', 'terminated', 'truncated', 'stuck', 'fallen', 'timeout')
     env = Monitor(env, save_record_pth, info_keywords=info_keywords)
     check_env(env)
+
+    # Save a checkpoint every 1000 steps
+    checkpoint_callback = CheckpointCallback(
+        save_freq=25000,
+        save_path=save_dir,
+        name_prefix="checkpoint",
+        save_replay_buffer=False,
+        save_vecnormalize=False,
+    )
+
 
     # Load models
     if load_model:
@@ -55,7 +67,7 @@ def SB_PPO_Train():
         model = PPO("MlpPolicy", env, verbose=1)
 
     # Train
-    model.learn(total_timesteps=25000)
+    model.learn(total_timesteps=1000000, callback=checkpoint_callback)
 
     # Save models
     if save_model:

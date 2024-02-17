@@ -2,6 +2,28 @@ import numpy as np
 from scipy.signal import convolve
 
 
+def DiceCoef(Jmat, X):
+    """
+    Parameters
+    ----------
+    Jmat : ndarray
+        Shape (N, F, K) with values [0, 1]
+    X : ndarray
+        Shape (F, K) with values [0, 1].
+
+    Returns
+    -------
+    Dice_Coefficient: ndarray
+        Shape (N, )
+
+    """
+    N, F, K = Jmat.shape
+
+    DC = (Jmat.reshape(N, -1) * X.reshape(1, -1)).sum(axis=1) / np.clip(Jmat.reshape(N, -1) + X.reshape(1, -1), a_min=0,
+                                                                        a_max=1).sum(axis=1)
+    return DC
+
+
 class Sequences:
     def __init__(self, R: int, L: int, reobserve: bool = True):
         self.R = R
@@ -119,18 +141,20 @@ class MatrixJ:
 
 
 class StateDecoder:
-    def __init__(self, R, L, maxN=500):
+    def __init__(self, R, L, maxN=500, infer_mode='Dice'):
         self.R = R
         self.K = R + L - 1  # Number of columns of decoder matrix J
         self.N = 0  # Number of state nodes
         self.maxN = maxN  # When N reaches the maximum, no new node will be expanded.
         self.learn_mode = True  # Whether expanding new state is allowed.
+        self.infer_mode = infer_mode  # "Dice" or "Sum"
         self.current_F = 0
         self.current_Sid = 0  # Current ID of the state node
         self.current_Sval = 0
-        self.lowSThresh = 0.11
+        self.lowSThresh = 0.1
         self.J = MatrixJ(self.N, self.current_F,
                          self.K)  # MatrixJ mapping J.reshape(N, -1) @ X.flatten() = State vector
+
 
     def learn(self, X):
         """
@@ -167,6 +191,37 @@ class StateDecoder:
             self.J.increment(X_norm, self.N - 1)
 
 
+    def learn2(self, X):
+        """
+
+        Parameters
+        ----------
+        X : ndarray
+            2-d array with shape (F, K). F = Number of feature nodes. K = R + L - 1.
+
+        Returns
+        -------
+
+        """
+
+        # Conditions trigger creating a new experience node
+        N_tag = self.N < 1
+        S_tag = self.current_Sval <= self.lowSThresh
+
+        Xarea = np.sum(X)
+
+        if Xarea > 1e-6:
+            if N_tag or S_tag:
+                # Create a new state node
+                self.N = self.J.expand_N(1)
+                if self.infer_mode == "Sum":
+                    # Associate X with the  N-th node
+                    X_norm = X / Xarea
+                    self.J.increment(X_norm, self.N - 1)
+                elif self.infer_mode == "Dice":
+                    self.J.increment(X, self.N - 1)
+
+
     def infer_state(self, X):
         # Extend self.J.mat to the shape of X
         newF = X.shape[0]
@@ -187,7 +242,7 @@ class StateDecoder:
             self.current_Sval = 0
 
         else:
-            Snodes = self.J.mat.reshape(self.N, self.current_F * self.K) @ X.flatten()
+            Snodes = self.infer_func(self.J.mat, X)
             if np.sum(Snodes) < 1e-6:
                 # print('Inference: all Snodes are zeros')
                 self.current_Sval = 0
@@ -203,7 +258,15 @@ class StateDecoder:
     def reach_maximum(self):
         return self.N >= self.maxN
 
-    def update_decoder(self, newJmat):
-        self.J.mat = newJmat
-        self.N = newJmat.shape[0]
+
+    def infer_func(self, Jmat, X):
+        if self.infer_mode == "Sum":
+            Snodes = Jmat.reshape(self.N, self.current_F * self.K) @ X.flatten()
+        elif self.infer_mode == "Dice":
+            Snodes = DiceCoef(Jmat, X)
+        else:
+            raise ValueError("StateDecoder.infer_mode must be either 'Sum' or 'Dice'.")
+        return Snodes
+
+
 
