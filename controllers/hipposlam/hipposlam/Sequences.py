@@ -1,5 +1,8 @@
 import numpy as np
+from pycircstat import cdiff
 from scipy.signal import convolve
+
+from .comput_utils import midedges
 
 
 def DiceCoef(Jmat, X):
@@ -140,14 +143,23 @@ class MatrixJ:
         self.mat = self.mat / norm.reshape(norm.shape[0], 1, 1)
 
 
+    def normalize_slice(self, sid, area=False):
+        N, F, K = self.mat.shape
+        assert N > 0
+        assert F > 0
+        if area:
+            norm = np.sum(self.mat[sid, :, :])
+        else:
+            norm = np.sqrt(np.sum(self.mat[sid, :, :] ** 2))
+        self.mat[sid, :, :] = self.mat[sid, :, :] / norm
+
 class StateDecoder:
-    def __init__(self, R, L, maxN=500, infer_mode='Dice'):
+    def __init__(self, R, L, maxN=500):
         self.R = R
         self.K = R + L - 1  # Number of columns of decoder matrix J
         self.N = 0  # Number of state nodes
         self.maxN = maxN  # When N reaches the maximum, no new node will be expanded.
         self.learn_mode = True  # Whether expanding new state is allowed.
-        self.infer_mode = infer_mode  # "Dice" or "Sum"
         self.current_F = 0
         self.current_Sid = 0  # Current ID of the state node
         self.current_Sval = 0
@@ -156,42 +168,12 @@ class StateDecoder:
                          self.K)  # MatrixJ mapping J.reshape(N, -1) @ X.flatten() = State vector
 
 
-    def learn(self, X):
-        """
 
-        Parameters
-        ----------
-        X : ndarray
-            2-d array with shape (F, K). F = Number of feature nodes. K = R + L - 1.
-
-        Returns
-        -------
-
-        """
-
-        # Conditions trigger creating a new experience node
-        N_tag = self.N < 1
-        S_tag = self.current_Sval <= self.lowSThresh
-
-        Xarea = np.sum(X)
-        if N_tag:
-            X_tag = True
-        else:
-            # filtermask = self.J.mat[self.current_Sid, :, :] < 1e-6
-            # X_tag = np.any(X[filtermask]) > 0
-            PreviousQuietMask = self.J.mat[self.current_Sid, :, :].sum(axis=1) < 1e-6
-            PreviousQuietIDs = np.where(PreviousQuietMask)[0]
-            X_tag = np.any(X[PreviousQuietIDs, :] > 0)
-
-        if (N_tag & (Xarea > 1e-6)) or (S_tag and X_tag):
-            # Create a new state node
-            self.N = self.J.expand_N(1)
-            # Associate X with the  N-th node
-            X_norm = X / Xarea
-            self.J.increment(X_norm, self.N - 1)
+    def set_lowSthresh(self, s):
+        self.lowSThresh = s
 
 
-    def learn2(self, X):
+    def learn_unsupervised(self, X):
         """
 
         Parameters
@@ -214,21 +196,38 @@ class StateDecoder:
             if N_tag or S_tag:
                 # Create a new state node
                 self.N = self.J.expand_N(1)
-                if self.infer_mode == "Sum":
-                    # Associate X with the  N-th node
-                    X_norm = X / Xarea
-                    self.J.increment(X_norm, self.N - 1)
-                elif self.infer_mode == "Dice":
-                    self.J.increment(X, self.N - 1)
+                # Associate X with the  N-th node
+                X_norm = X / Xarea
+                self.J.increment(X_norm, self.N - 1)
 
+    def learn_supervised(self, X, sid=None):
+        """
+
+        Parameters
+        ----------
+        X : ndarray
+            2-d array with shape (F, K). F = Number of feature nodes. K = R + L - 1.
+
+        Returns
+        -------
+
+        """
+
+        # Create a new state node
+        if sid is None:
+            self.N = self.J.expand_N(1)
+            sid = self.N - 1
+        self.J.increment(X, sid)
+        self.J.normalize_slice(sid, area=False)
+        return sid
+
+    def update_F(self, X):
+        dF = X.shape[0] - self.J.mat.shape[1]
+        self.current_F = self.J.expand_F(dF)
 
     def infer_state(self, X):
         # Extend self.J.mat to the shape of X
-        newF = X.shape[0]
-        F_tag = newF > self.current_F
-        if F_tag:
-            dF = newF - self.J.mat.shape[1]
-            self.current_F = self.J.expand_F(dF)
+        self.update_F(X)
 
         if self.N == 0:
             self.current_Sid = 0
@@ -260,13 +259,71 @@ class StateDecoder:
 
 
     def infer_func(self, Jmat, X):
-        if self.infer_mode == "Sum":
-            Snodes = Jmat.reshape(self.N, self.current_F * self.K) @ X.flatten()
-        elif self.infer_mode == "Dice":
-            Snodes = DiceCoef(Jmat, X)
-        else:
-            raise ValueError("StateDecoder.infer_mode must be either 'Sum' or 'Dice'.")
+        Snodes = Jmat.reshape(self.N, self.current_F * self.K) @ X.flatten()
         return Snodes
 
 
+class StateTeacher:
+    def __init__(self, xbound, ybound, dp, da):
+        self.xmin, self.xmax = xbound
+        self.ymin, self.ymax = ybound
+        self.amin, self.amax = -np.pi, np.pi
+        self.dp = dp
+        self.da = da
+        self.xedges = np.arange(self.xmin, self.xmax + self.dp, self.dp)
+        self.yedges = np.arange(self.ymin, self.ymax + self.dp, self.dp)
+        self.aedges = np.arange(self.amin, self.amax + self.da, self.da)
 
+        self.xax = midedges(self.xedges)
+        self.yax = midedges(self.yedges)
+        self.aax = midedges(self.aedges)
+        self.xx, self.yy, self.aa = np.meshgrid(self.xax, self.yax, self.aax, indexing='ij')
+        self.xx1d, self.yy1d, self.aa1d = self.xx.flatten(), self.yy.flatten(), self.aa.flatten()
+        self.Nstates = self.xx1d.shape[0]
+        self.pred2gt_map = dict()
+        self.gt2pred_map = dict()
+
+    def store_sid(self, sid):
+        self.past_sids.append(sid)
+        return None
+
+    def store_prediction_mapping(self, sid_pred, sid_gt):
+        self.pred2gt_map[sid_pred] = sid_gt
+
+    def store_groundtruth_mapping(self, sid_gt, sid_pred):
+        self.gt2pred_map[sid_gt] = sid_pred
+
+
+    def map_pred_to_gt(self, sid_pred):
+        return self.pred2gt_map[sid_pred]
+
+    def match_prediction_storage(self, sid_pred):
+        if sid_pred in self.pred2gt_map:
+            return True
+        else:
+            return False
+
+    def match_groundtruth_storage(self, sid_gt):
+        if sid_gt in self.gt2pred_map:
+            return True
+        else:
+            return False
+
+
+    def lookup_xya(self, vals):
+        xval, yval, aval = vals
+        xind = self._lookup_xy(xval, self.xax)
+        yind = self._lookup_xy(yval, self.yax)
+        aind = self._lookup_a(aval, self.aax)
+        inds = (xind, yind, aind)
+        sid = np.ravel_multi_index(inds, dims=self.xx.shape)
+        return sid
+
+    def sid2xya(self, sid):
+        return (self.xx1d[sid], self.yy1d[sid], self.aa1d[sid])
+
+    def _lookup_xy(self, val, ax):
+        return np.argmin(np.square(val - ax))
+
+    def _lookup_a(self, val, ax):
+        return np.argmin(np.abs(cdiff(val, ax)))

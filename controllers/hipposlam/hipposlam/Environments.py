@@ -1,13 +1,14 @@
+from os.path import join
 from pprint import PrettyPrinter
 
 import numpy as np
+from stable_baselines3.common.callbacks import CheckpointCallback
 
 from controller import Supervisor
 import gymnasium as gym
 
-from .Sequences import Sequences, StateDecoder
+from .Sequences import Sequences, StateDecoder, StateTeacher
 from .utils import save_pickle, read_pickle
-
 
 class BreakRoom(Supervisor, gym.Env):
     def __init__(self, max_episode_steps=300, use_ds=True, use_bumper=False,  spawn='all', goal='hard'):
@@ -155,7 +156,7 @@ class BreakRoom(Supervisor, gym.Env):
         if stuck:
             print("\n================== Robot is stuck =================================\n")
             print('stuck_m = %0.4f'%(self.stuck_m))
-            reward, terminated, truncated = 0, False, True
+            reward, terminated, truncated = 0.01, False, True
 
 
         # Fallen detection
@@ -163,7 +164,7 @@ class BreakRoom(Supervisor, gym.Env):
         if fallen:
             print('\n================== Robot has fallen =============================\n')
             print('Rotations = %0.4f, %0.4f, %0.4f, %0.4f '%(rotx, roty, rotz, rota))
-            reward, terminated, truncated = 0, False, True
+            reward, terminated, truncated = 0.01, False, True
             if self.fallen:
                 self.fallen_seq += 1
             if self.fallen_seq > 5:
@@ -176,7 +177,7 @@ class BreakRoom(Supervisor, gym.Env):
         timeout = self.t > self.maxt
         if timeout:
             print('\n================== Time out =============================')
-            reward, terminated, truncated = 0, False, True
+            reward, terminated, truncated = 0.01, False, True
         self.t += 1
 
         # Info
@@ -278,14 +279,14 @@ class Forest(BreakRoom):
     def _get_intermediate_reward(self, x, y):
         r_bonus = 0
 
-        if (x < -7) and (y < 4) and (self.r_bonus_counts[0]<1):
+        if (x < -4) and (y < 4) and (self.r_bonus_counts[0]<1):
             r_bonus = 0.3
             self.r_bonus_counts[0] += 1
 
-        if (x < -7) and (y < -0.6) and (self.r_bonus_counts[1]<1):
+        if (x < -8) and (y < 0) and (self.r_bonus_counts[1]<1):
             r_bonus = 0.5
             self.r_bonus_counts[1] += 1
-        if (x < -8.15) and (y < -3) and (self.r_bonus_counts[2]<1):
+        if (x < -11) and (y < -4) and (self.r_bonus_counts[2]<1):
             r_bonus = 0.7
             self.r_bonus_counts[2] += 1
         if r_bonus > 0:
@@ -302,14 +303,9 @@ class Forest(BreakRoom):
             z = 0.1
         elif self.spawn_mode == "all":
             pts = np.array([
-                (3.54, 7.95, 0.09),
-                (5.25, 14.7, 0.31),
-                (-4.48, 14.8, 0.16),
-                (3.54, 0.91, 0.1),
-                (0.04, -5.69, 0.15),
-                (-5.88, 0.2, 0.1),
-                (-5.34, 7.65, 0.07),
-                (-14.2, 13.1, 0.09)
+                (-3, 5, 0.07),
+                (-11.6, 7.17, 0.2),
+                (-0.6, -3.43, 0.18),
             ])
             pti = np.random.choice(len(pts))
             x, y, z = pts[pti]
@@ -342,7 +338,7 @@ class OmniscientLearnerForest(Forest, OmniscientLearner):
 
 
 class StateMapLearner(BreakRoom):
-    def __init__(self, R=5, L=10, max_episode_steps=1000, max_hipposlam_states=500, use_ds=True, use_bumper=True, spawn='all', goal='hard', infer_mode='Sum'):
+    def __init__(self, R=5, L=10, max_episode_steps=1000, max_hipposlam_states=500, use_ds=True, use_bumper=True, spawn='all', goal='hard'):
         super(StateMapLearner, self).__init__(max_episode_steps, use_ds, use_bumper, spawn, goal)
         self.observation_space = gym.spaces.Discrete(max_hipposlam_states)
 
@@ -358,16 +354,26 @@ class StateMapLearner(BreakRoom):
         self.fpos_dict = dict()
         self.obj_dist = 3  # in meters
         self.hipposeq = Sequences(R=R, L=L, reobserve=False)
-        self.hippomap = StateDecoder(R=R, L=L, maxN=max_hipposlam_states, infer_mode=infer_mode)
+        self.hippomap = StateDecoder(R=R, L=L, maxN=max_hipposlam_states)
 
+        self.move_d = self.MAX_SPEED
+        self._action_to_direction = {
+            0: np.array([self.move_d, self.move_d]),  # Forward
+            1: np.array([0, self.move_d]) * 0.5,  # Left turn
+            2: np.array([self.move_d, 0]) * 0.5,  # Right turn
+        }
 
-    def get_obs(self):
+    def get_obs_base(self):
         id_list = self.recognize_objects()
         self.hipposeq.step(id_list)
         sid, Snodes = self.hippomap.infer_state(self.hipposeq.X)
         if (self.hippomap.reach_maximum() is False) and (self.hippomap.learn_mode):
-            self.hippomap.learn2(self.hipposeq.X)
-        print('Interred state = %d   / %d  , val = %0.2f. F = %d, Xsum=%0.4f'%(sid+1, self.hippomap.N, Snodes[sid], self.hippomap.current_F, self.hipposeq.X.sum()))
+            self.hippomap.learn_unsupervised(self.hipposeq.X)
+        # print('Interred state = %d   / %d  , val = %0.2f. F = %d, Xsum=%0.4f'%(sid+1, self.hippomap.N, Snodes[sid], self.hippomap.current_F, self.hipposeq.X.sum()))
+        return sid, Snodes
+
+    def get_obs(self):
+        sid, Snodes = self.get_obs_base()
         return sid
 
     def reset(self, seed=None):
@@ -460,38 +466,147 @@ class StateMapLearner(BreakRoom):
         self.hipposeq = hippodata['hipposeq']
 
 
+class StateMapLearnerTaught(StateMapLearner):
+
+    def __init__(self, R=5, L=10, max_episode_steps=1000, use_ds=True, use_bumper=True, spawn='all', goal='hard'):
+        super(StateMapLearner, self).__init__(max_episode_steps, use_ds, use_bumper, spawn, goal)
+
+        self.xbound = (-6.4, 8.4)
+        self.ybound = (-8.6, 16.2)
+        self.dp = 2  # 2
+        self.da = 2 * np.pi / 12  # 12
+        self.hippoteach = StateTeacher(self.xbound, self.ybound, self.dp, self.da)
+        self.max_Nstates = self.hippoteach.Nstates
 
 
+        # Camera
+        self.camera_timestep = self.thetastep
+        self.cam = self.getDevice('camera')
+        self.cam.enable(self.camera_timestep)
+        self.cam.recognitionEnable(self.camera_timestep)
+        self.cam_width = self.cam.getWidth()
+        self.cam_height = self.cam.getHeight()
+
+        # hippoSlam
+        self.fpos_dict = dict()
+        self.obj_dist = 3  # in meters
+        self.hipposeq = Sequences(R=R, L=L, reobserve=False)
+        self.hippomap = StateDecoder(R=R, L=L, maxN=self.max_Nstates)
+
+
+        # Actions
+        self.move_d = self.MAX_SPEED
+        self._action_to_direction = {
+            0: np.array([self.move_d, self.move_d]),  # Forward
+            1: np.array([0, self.move_d]) * 0.5,  # Left turn
+            2: np.array([self.move_d, 0]) * 0.5,  # Right turn
+        }
+
+        self.observation_space = gym.spaces.Discrete(self.max_Nstates)
+
+
+
+    def get_obs_base(self):
+
+        # Teacher
+        x, y, _ = self._get_translation()
+        _, _, rotz, rota = self._get_rotation()
+        a = np.sign(rotz) * rota
+        sidgt = self.hippoteach.lookup_xya((x, y, a))
+
+
+        id_list = self.recognize_objects()
+        self.hipposeq.step(id_list)
+        sidpred, Snodes = self.hippomap.infer_state(self.hipposeq.X)
+
+
+
+        if self.hipposeq.X.sum() < 1e-6:
+            # print('X is zero. Learning skipped.')
+            # if self.hippoteach.match_groundtruth_storage(sidgt):
+            #     print(
+            #         f'InferredState {sidpred}/{self.hippomap.N} (mappedGT={self.hippoteach.pred2gt_map[sidpred]}), val={Snodes[sidpred]}')
+            # else:
+            #     print(
+            #         f'InferredState {sidpred}/{self.hippomap.N}')
+
+            return sidpred, Snodes
+
+        # print('GroundTruthState Storage = \n', self.hippoteach.pred2gt_map)
+        if self.hippoteach.match_groundtruth_storage(sidgt):
+            # print(f'GroundTruthState {sidgt} found in storage')
+
+            if self.hippoteach.pred2gt_map[sidpred] == sidgt:
+                msg = 'Match    '
+                _ = self.hippomap.learn_supervised(self.hipposeq.X, sid=sidpred)
+                # print(f'{self.hippoteach.pred2gt_map[sidpred]} match {sidgt}. Learning happened' + "="*100)
+            # else:
+            #     msg = 'NOT Match'
+            #     _ = self.hippomap.learn_supervised(self.hipposeq.X, sid=self.hippoteach.gt2pred_map[sidgt])
+
+            print(
+                f'{msg} InferredState {sidpred}/{self.hippomap.N} (mappedGT={self.hippoteach.pred2gt_map[sidpred]} vs {sidgt}), val={Snodes[sidpred]}')
+
+        else:
+            # print(f'GroundTruthState {sidgt} not found')
+            sidpred = self.hippomap.learn_supervised(self.hipposeq.X)
+            Snodes = np.zeros(self.hippomap.N)
+            Snodes[sidpred] = 1
+            self.hippoteach.store_prediction_mapping(sidpred, sidgt)
+            self.hippoteach.store_groundtruth_mapping(sidgt, sidpred)
+            # print(f'New inferred state {sidpred} created.')
+
+        # print()
+        return sidpred, Snodes
+
+        # return sidgt, _
+
+    def save_hipposlam(self, pth):
+        save_pickle(pth, dict(hipposeq=self.hipposeq, hippomap=self.hippomap, hippoteach=self.hippoteach))
+
+    def load_hipposlam(self, pth):
+        hippodata = read_pickle(pth)
+        self.hippomap = hippodata['hippomap']
+        self.hipposeq = hippodata['hipposeq']
+        self.hippoteach = hippodata['hippoteach']
 
 
 
 class StateMapLearnerForest(StateMapLearner, Forest):
-    def __init__(self, R=5, L=10, max_episode_steps=1000, max_hipposlam_states=500, use_ds=True, use_bumper=True, spawn='all', goal='hard', infer_mode='Sum'):
-        super(StateMapLearnerForest, self).__init__(R, L, max_episode_steps, max_hipposlam_states, use_ds, use_bumper, spawn, goal, infer_mode)
+    def __init__(self, R=5, L=10, max_episode_steps=1000, max_hipposlam_states=500, use_ds=True, use_bumper=True, spawn='all', goal='hard'):
+        super(StateMapLearnerForest, self).__init__(R, L, max_episode_steps, max_hipposlam_states, use_ds, use_bumper, spawn, goal)
         self.fallen_thresh = 1
-        self.stuck_epsilon = 1e-4
+        self.stuck_epsilon = 1e-3
+        self.stuck_thresh = 8.5
+        self.hippomap.set_lowSthresh(0.2)
+
+
+
+class StateMapLearnerTaughtForest(StateMapLearnerTaught, Forest):
+    def __init__(self, R=5, L=10, max_episode_steps=1000, use_ds=True, use_bumper=True, spawn='all', goal='hard'):
+        super(StateMapLearnerTaughtForest, self).__init__(R, L, max_episode_steps, use_ds, use_bumper, spawn, goal)
+        self.fallen_thresh = 1
+        self.stuck_epsilon = 1e-3
+        self.stuck_thresh = 8.5
+        self.hippomap.set_lowSthresh(0.2)
+
+
 
 
 
 class StateMapLearnerForestSnodes(StateMapLearnerForest):
-    def __init__(self, R=5, L=10, max_episode_steps=1000, max_hipposlam_states=500, use_ds=True, use_bumper=True, spawn='all', goal='hard', infer_mode='Sum'):
-        super(StateMapLearnerForestSnodes, self).__init__(R, L, max_episode_steps, max_hipposlam_states, use_ds, use_bumper, spawn, goal, infer_mode)
+    def __init__(self, R=5, L=10, max_episode_steps=1000, max_hipposlam_states=500, use_ds=True, use_bumper=True, spawn='all', goal='hard'):
+        super(StateMapLearnerForestSnodes, self).__init__(R, L, max_episode_steps, max_hipposlam_states, use_ds, use_bumper, spawn, goal)
         self.obs_dim = max_hipposlam_states
         lowBox = np.zeros(self.obs_dim).astype(np.float32)
         highBox = np.ones(self.obs_dim).astype(np.float32)
         self.observation_space = gym.spaces.Box(lowBox, highBox, shape=(self.obs_dim,))
 
 
-
     def get_obs(self):
-        id_list = self.recognize_objects()
-        self.hipposeq.step(id_list)
-        sid, Snodes = self.hippomap.infer_state(self.hipposeq.X)
-        if (self.hippomap.reach_maximum() is False) and (self.hippomap.learn_mode):
-            self.hippomap.learn2(self.hipposeq.X)
-        # print('Interred state = %d   / %d  , val = %0.2f. F = %d, Xsum=%0.4f'%(sid+1, self.hippomap.N, Snodes[sid], self.hippomap.current_F, self.hipposeq.X.sum()))
+        sid, Snodes = self.get_obs_base()
         Snodesvec = np.zeros(self.obs_dim).astype(np.float32)
         Snodesvec[:len(Snodes)] = Snodes
-
         return Snodesvec
+
 
