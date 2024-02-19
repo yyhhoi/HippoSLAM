@@ -35,8 +35,8 @@ def SB_PPO_Train():
     # Paths
     save_dir = join('data', 'StateMapLearnerTaughtForest_R5L40')
     os.makedirs(save_dir, exist_ok=True)
-    load_model_name = 'PPO2_HalfSupervised_lr1_dp3_da8'
-    save_model_name = 'PPO3_HalfSupervised_lr1_dp3_da8'
+    load_model_name = 'PPO3_HalfSupervised_lr1_dp3_da8'
+    save_model_name = 'PPO4_HalfSupervised_lr1_dp3_da8'
     load_hipposlam_pth = join(save_dir, '%s_hipposlam.pickle' % load_model_name)
     load_model_pth = join(save_dir, '%s.zip'%(load_model_name))
     save_hipposlam_pth = join(save_dir, '%s_hipposlam.pickle' % save_model_name)
@@ -71,7 +71,7 @@ def SB_PPO_Train():
         model = model_class("MlpPolicy", env, verbose=1)
 
     # Train
-    model.learn(total_timesteps=50000, callback=None)
+    model.learn(total_timesteps=2000000, callback=checkpoint_callback)
 
     # Save models
     if save_model:
