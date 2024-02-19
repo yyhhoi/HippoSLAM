@@ -35,7 +35,7 @@ def breakroom_avoidance_policy(x, y, dsval, noise=0.3):
     return a
 
 
-class PerformanceRecorder:
+class Recorder:
     def __init__(self, *args):
         self.records_dict = {key:[] for key in args}
         self.records_df = None
@@ -47,5 +47,4 @@ class PerformanceRecorder:
     def to_csv(self, save_pth):
         self.records_df = pd.DataFrame(self.records_dict)
         self.records_df.to_csv(save_pth)
-
 

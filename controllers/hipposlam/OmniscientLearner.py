@@ -8,7 +8,7 @@ from os.path import join
 from matplotlib import pyplot as plt
 
 from hipposlam.Replay import ReplayMemoryAWAC, ReplayMemoryA2C
-from hipposlam.utils import save_pickle, read_pickle, breakroom_avoidance_policy, PerformanceRecorder
+from hipposlam.utils import save_pickle, read_pickle, breakroom_avoidance_policy, Recorder
 from hipposlam.Networks import MLP
 from hipposlam.ReinforcementLearning import AWAC, A2C, compute_discounted_returns
 from hipposlam.Environments import OmniscientLearner, OmniscientLearnerForest
@@ -91,7 +91,7 @@ def StartOnlineA2C():
 
     # Environment
     env = OmniscientLearner(spawn='start', goal='easy', use_ds=False)
-    PR = PerformanceRecorder('i', 't', 'r', 'closs', 'aloss')
+    PR = Recorder('i', 't', 'r', 'closs', 'aloss')
 
     # Unrolle
     Niters = 500
@@ -175,7 +175,7 @@ def naive_avoidance():
     env = OmniscientLearner(spawn='start', goal='hard')
 
     # Record data and epsidoes
-    PRtraj = PerformanceRecorder('i', 't', 'r')
+    PRtraj = Recorder('i', 't', 'r')
 
     data = {'episodes':[], 'end_r':[], 't':[]}
     cum_win = 0
@@ -281,7 +281,7 @@ def fine_tune_trained_model():
 
     # Environment
     env = OmniscientLearner(spawn='start', goal='hard')
-    PR = PerformanceRecorder('i', 't', 'r', 'closs', 'aloss')
+    PR = Recorder('i', 't', 'r', 'closs', 'aloss')
 
 
     Niters = 500
@@ -387,7 +387,7 @@ def evaluate_trained_model():
 
     # Environment
     env = OmniscientLearner(spawn='start', goal='hard')
-    PRtraj = PerformanceRecorder('i', 't', 'r')
+    PRtraj = Recorder('i', 't', 'r')
 
     # Unroll
     Niters = 100

@@ -14,30 +14,20 @@ from torch import nn
 from hipposlam.Networks import MLP
 # from hipposlam.ReinforcementLearning import AWAC, A2C, compute_discounted_returns
 from hipposlam.Replay import ReplayMemoryAWAC, ReplayMemoryA2C
-from hipposlam.utils import breakroom_avoidance_policy, save_pickle, PerformanceRecorder, read_pickle
+from hipposlam.utils import breakroom_avoidance_policy, save_pickle, Recorder, read_pickle
 from hipposlam.Environments import StateMapLearner, StateMapLearnerTaughtForest
 from os.path import join
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
-class CustomCheckpointCallBack(CheckpointCallback):
-    def _on_step(self) -> bool:
-        if self.n_calls % self.save_freq == 0:
-            model_path = self._checkpoint_path(extension="zip")
-            self.model.save(model_path)
-            self.model.get_env().save_hipposlam(join(self.save_path, 'hipposlam_checkpt_%d.pickle'%(self.n_calls)))
-            if self.verbose >= 2:
-                print(f"Saving model checkpoint to {model_path}")
-
-
-        return True
-
-
+# Notes
+# - Fully superviosed:
+# - half-supervised: PPO5_OnlyCorrectLearnt_lr1_dp2_da12: Not successful aver. R ~ 0.2
 
 
 def SB_PPO_Train():
     # Modes
-    load_model = False
+    load_model = True
     save_model = True
     hippomap_learn = True
     model_class = PPO
@@ -45,8 +35,8 @@ def SB_PPO_Train():
     # Paths
     save_dir = join('data', 'StateMapLearnerTaughtForest_R5L40')
     os.makedirs(save_dir, exist_ok=True)
-    load_model_name = ''
-    save_model_name = 'PPO1_OnlyCorrectLearnt_lr1_dp2_da12'
+    load_model_name = 'PPO2_HalfSupervised_lr1_dp3_da8'
+    save_model_name = 'PPO3_HalfSupervised_lr1_dp3_da8'
     load_hipposlam_pth = join(save_dir, '%s_hipposlam.pickle' % load_model_name)
     load_model_pth = join(save_dir, '%s.zip'%(load_model_name))
     save_hipposlam_pth = join(save_dir, '%s_hipposlam.pickle' % save_model_name)
@@ -54,13 +44,14 @@ def SB_PPO_Train():
     save_record_pth = join(save_dir, '%s_TrainRecords.csv' % save_model_name)
 
     # Environment
-    env = StateMapLearnerTaughtForest(R=5, L=40, spawn='all', goal='hard', max_episode_steps=350, use_ds=False, use_bumper=False)
+    env = StateMapLearnerTaughtForest(R=5, L=40, spawn='all', goal='hard', max_episode_steps=350, use_ds=False,
+                                      save_hipposlam_pth=save_hipposlam_pth)
     info_keywords = ('Nstates', 'last_r', 'terminated', 'truncated', 'stuck', 'fallen', 'timeout')
     env = Monitor(env, save_record_pth, info_keywords=info_keywords)
     check_env(env)
 
     # Save a checkpoint every ? steps
-    checkpoint_callback = CustomCheckpointCallBack(
+    checkpoint_callback = CheckpointCallback(
         save_freq=25000,
         save_path=save_dir,
         name_prefix="checkpoint",
@@ -80,7 +71,7 @@ def SB_PPO_Train():
         model = model_class("MlpPolicy", env, verbose=1)
 
     # Train
-    model.learn(total_timesteps=100000, callback=checkpoint_callback)
+    model.learn(total_timesteps=50000, callback=None)
 
     # Save models
     if save_model:
@@ -139,7 +130,7 @@ def OnlineA2C():
     if load_hipposlam:
         env.load_hipposlam(load_hipposlam_pth)
     env.hippomap.learn_mode = hipposlam_learn_mode
-    PR = PerformanceRecorder('i', 't', 'r', 'closs', 'aloss')
+    PR = Recorder('i', 't', 'r', 'closs', 'aloss')
 
     # Unrolle
     Niters = 200
@@ -364,7 +355,7 @@ def evaluate_trained_model():
     env = StateMapLearner(spawn='start', goal='hard')
     env.load_hipposlam(load_hipposlam_pth)
     env.hipposlam.learn_mode = hipposlam_learn
-    PR = PerformanceRecorder(save_record_pth)
+    PR = Recorder(save_record_pth)
 
     # Unroll
     Niters = 100
@@ -415,7 +406,7 @@ def naive_avoidance():
         env.load_hipposlam(load_hipposlam_pth)
 
     # Record data and episodes
-    PR = PerformanceRecorder(save_record_pth)
+    PR = Recorder(save_record_pth)
     data = {'episodes':[], 'end_r':[], 't':[], 'traj':[]}
     cum_win = 0
     maxtimeout = 300

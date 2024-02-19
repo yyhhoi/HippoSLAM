@@ -154,7 +154,7 @@ class MatrixJ:
         self.mat[sid, :, :] = self.mat[sid, :, :] / norm
 
 class StateDecoder:
-    def __init__(self, R, L, maxN=500):
+    def __init__(self, R, L, maxN=500, lr=1):
         self.R = R
         self.K = R + L - 1  # Number of columns of decoder matrix J
         self.N = 0  # Number of state nodes
@@ -166,7 +166,7 @@ class StateDecoder:
         self.lowSThresh = 0.1
         self.J = MatrixJ(self.N, self.current_F,
                          self.K)  # MatrixJ mapping J.reshape(N, -1) @ X.flatten() = State vector
-
+        self.lr = lr
 
 
     def set_lowSthresh(self, s):
@@ -198,7 +198,7 @@ class StateDecoder:
                 self.N = self.J.expand_N(1)
                 # Associate X with the  N-th node
                 X_norm = X / Xarea
-                self.J.increment(X_norm, self.N - 1)
+                self.J.increment(X_norm * self.lr, self.N - 1)
 
     def learn_supervised(self, X, sid=None):
         """
@@ -217,7 +217,7 @@ class StateDecoder:
         if sid is None:
             self.N = self.J.expand_N(1)
             sid = self.N - 1
-        self.J.increment(X, sid)
+        self.J.increment(X * self.lr, sid)
         self.J.normalize_slice(sid, area=False)
         return sid
 
