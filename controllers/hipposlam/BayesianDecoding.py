@@ -1,50 +1,76 @@
-import numpy as np
-from hipposlam.utils import read_pickle
-from hipposlam.Sequences import Sequences
-from hipposlam.comput_utils import circular_gau_filter, divide_ignore, midedges, Arena
+from os.path import join
 import pandas as pd
 import matplotlib.pyplot as plt
-from os.path import join
-import os
-import matplotlib as mpl
-from matplotlib import cm
-from tqdm import tqdm
-from scipy.ndimage import gaussian_filter
 from scipy.special import factorial
 
+from hipposlam.utils import read_pickle
+from hipposlam.comput_utils import Arena, circular_gau_filter
+from hipposlam.Sequences import Sequences, createX
+from scipy.ndimage import gaussian_filter1d
+from scipy.ndimage import gaussian_filter
+import numpy as np
+import collections
+import os
+from tqdm import tqdm
 
 
-
-# Paths and data===============
-debug_plot_tag = True
-project_tag = 'Avoidance_CombinedCues_theta1024'
-data_dir = join('data', project_tag)
-plot_dir = join('plots', project_tag, 'BayesianDecoding')
+# Load data =============================================
+debug_plot_tag = False
+project_name = 'StateMapLearnerTaughtForest_R5L20_dp2_da8'
+project_dir = join('data', project_name)
+plot_dir = join('plots', project_name)
 os.makedirs(plot_dir, exist_ok=True)
-trajdata = read_pickle(join(data_dir, 'traj.pickle'))
-metadata = read_pickle(join(data_dir, 'meta.pickle'))
-seqR = metadata['seqR']
-seqL = metadata['seqL']
-fkey2id_dict = metadata['stored_f']
-id2fkey_dict = {val:key for key, val in fkey2id_dict.items()}
-f_pos = metadata['fpos']
-trajdf = pd.DataFrame(trajdata)
-trajdf['X_Nrow'] = trajdf['X'].apply(lambda x : x.shape[0])
-trajdf['a'] = trajdf['rota'] * trajdf['rotz']
+chpt_name = 'PPO$_FullySupervised'
+max_chpt_num = 7
+
+# Append traj data and fsigma
+trajkeys = 't', 'x', 'y', 'a', 'sid', 'r', 'terminated', 'truncated'
+alltrajdict = {key:[] for key in trajkeys}
+allfsigmalist = []
+for i in range(1, max_chpt_num+1):
+    traj_data_pth = join(project_dir, chpt_name.replace('$', '%d'%i) + '_trajdata.pickle')
+    trajdict_list = read_pickle(traj_data_pth)  # a list of dictionaries, each for one episode
+    for trajdict in trajdict_list:
+        # Traj data
+        for key in trajkeys:
+            alltrajdict[key].extend(trajdict[key])
+        # Fsigma
+        allfsigmalist.extend(trajdict['fsigma'])
+alltrajdf = pd.DataFrame(alltrajdict)
+
+# Load hipposlam
+load_hipposlam_pth = join(project_dir, chpt_name.replace('$', '%d'%max_chpt_num) + '_hipposlam.pickle')
+hipposlam = read_pickle(load_hipposlam_pth)
+hipposeq = hipposlam['hipposeq']
+hippomap = hipposlam['hippomap']
+hippoteach = hipposlam['hippoteach']
+fpos = hipposlam['fpos']
+R = hipposeq.R
+L = hipposeq.L
+F = hipposeq.num_f
+K = hipposeq.X_Ncol
+stored_f = hipposeq.stored_f
+id2fkey_dict = {val:key for key, val in stored_f.items()}
+
+# Assert data validity
+assert R == hippomap.R
+assert F == hippomap.current_F
+assert K == hippomap.K
+assert alltrajdf.shape[0] == len(allfsigmalist)
 
 
 # Occpancy ===========================
 bodysd = 0.15  # body length of the robot = 0.3m
-dp = 0.1
+dp = 0.5
 da = 2*np.pi/18
-xmin = np.floor(trajdf['x'].min() * 10) / 10
-xmax = np.ceil(trajdf['x'].max() * 10) / 10
-ymin = np.floor(trajdf['y'].min() * 10) / 10
-ymax = np.ceil(trajdf['y'].max() * 10) / 10
+xmin = np.floor(alltrajdf['x'].min() * 10) / 10
+xmax = np.ceil(alltrajdf['x'].max() * 10) / 10
+ymin = np.floor(alltrajdf['y'].min() * 10) / 10
+ymax = np.ceil(alltrajdf['y'].max() * 10) / 10
 amin, amax = -np.pi, np.pi
 
 BD = Arena(xmin, xmax, ymin, ymax, amin, amax, dp, da, bodysd)
-occ, edges3d = BD.compute_histogram3d(trajdf['x'].to_numpy(), trajdf['y'].to_numpy(), trajdf['a'].to_numpy())
+occ, edges3d = BD.compute_histogram3d(alltrajdf['x'].to_numpy(), alltrajdf['y'].to_numpy(), alltrajdf['a'].to_numpy())
 occ_p = occ.sum(axis=2)
 occ_a = occ.sum(axis=0).sum(axis=0)
 if debug_plot_tag:
@@ -57,62 +83,49 @@ if debug_plot_tag:
     ax2.bar(BD.aedm, occ_a, width=da)
     fig.savefig(join(plot_dir, 'Occupancy.png'))
 
-# Organize Spike Data ====================
-Num_Fnodes = trajdf['X_Nrow'].max()
-xdict = dict()
-ydict = dict()
-adict = dict()
-fposdict = dict()
-for i in range(trajdf.shape[0]):
 
-    Xmat = trajdf['X'][i]
-    x = trajdf['x'][i]
-    y = trajdf['y'][i]
-    a = trajdf['a'][i]
 
-    if Xmat.shape[0] < 1:
-        continue
-    fnode_ids, sigma_ids = Sequences.X2sigma(Xmat, seqR, sigma_state=False)
+# Obtain x, y, a data for each sigma ======================================
+xdict = collections.defaultdict(list)
+ydict = collections.defaultdict(list)
+adict = collections.defaultdict(list)
+for t in range(alltrajdf.shape[0]):
+    x = alltrajdf['x'][t]
+    y = alltrajdf['y'][t]
+    a = alltrajdf['a'][t]
+    fsigma = allfsigmalist[t]
+
+    X = createX(R, F, K, stored_f, fsigma)
+
+    fnode_ids, sigma_ids = Sequences.X2sigma(X, R, sigma_state=False)
 
     for fnode_id, sigma_id in zip(fnode_ids, sigma_ids):
         nodekey = id2fkey_dict[fnode_id]
-        ensem_key = '%s-%d'%(nodekey, sigma_id)
-
-        fposdict[ensem_key] = f_pos[nodekey.split('_')[0]]
-
-        if ensem_key in xdict:
-            xdict[ensem_key].append(x)
-            ydict[ensem_key].append(y)
-            adict[ensem_key].append(a)
-
-        else:
-            xdict[ensem_key] = [x]
-            ydict[ensem_key] = [y]
-            adict[ensem_key] = [a]
+        ensem_key = '%s_%d'%(nodekey, sigma_id)
+        xdict[ensem_key].append(x)
+        ydict[ensem_key].append(y)
+        adict[ensem_key].append(a)
 
 
+# RateMap ==================================================================
 
-# Compute Rate Map =================
-plot_ratemap = True
 plot_dir_ratemap = join(plot_dir, 'ratemaps')
 os.makedirs(plot_dir_ratemap, exist_ok=True)
 print('Compute ratemaps')
 print('Save at ', plot_dir_ratemap)
-num_ensem = len(xdict.keys())
-id2ensemkey = [ensem_key for ensem_key in xdict.keys()]
-ensemkey2id = dict()
-for i, ensem_key in enumerate(id2ensemkey):
+
+all_ratemaps = np.zeros((len(xdict), BD.xedm.shape[0], BD.yedm.shape[0], BD.aedm.shape[0]))
+ensemkey2id = {}
+for i, ensem_key in enumerate(tqdm(xdict)):
+
+    objid, dist, sigma = ensem_key.split('_')
     ensemkey2id[ensem_key] = i
 
-all_ratemaps = np.zeros((num_ensem, BD.xedm.shape[0], BD.yedm.shape[0], BD.aedm.shape[0]))
 
-for i in tqdm(range(num_ensem)):
-
-    ensem_key = id2ensemkey[i]
     xsp = xdict[ensem_key]
     ysp = ydict[ensem_key]
     asp = adict[ensem_key]
-    fpos = fposdict[ensem_key]
+    fposeach = fpos[objid]
 
     Hsp3d, _ = BD.compute_histogram3d(xsp, ysp, asp)
     ratemap_3d = BD.compute_ratemap(occ, Hsp3d)
@@ -121,6 +134,8 @@ for i in tqdm(range(num_ensem)):
     all_ratemaps[i, :, :, :] = ratemap_3d_gau
 
     if debug_plot_tag:
+        if int(sigma) not in [1, 5, 10, 15, 20]:
+            continue
         ratemap_pos = ratemap_3d_gau.mean(axis=2)
         ratemap_a = ratemap_3d_gau.mean(axis=0).mean(axis=0)
 
@@ -131,9 +146,9 @@ for i in tqdm(range(num_ensem)):
 
 
         im1 = ax1.pcolormesh(BD.xedges, BD.yedges, ratemap_pos.T, cmap='jet')
-        ax1.scatter(fpos[0], fpos[1], color='g', s=100)
+        ax1.scatter(fposeach[0], fposeach[1], color='g', s=100)
         r = 2
-        ax1.quiver(xsp, ysp, r* np.cos(asp), r*np.sin(asp), color='r', alpha=0.5, scale=75)
+        # ax1.quiver(xsp, ysp, r* np.cos(asp), r*np.sin(asp), color='r', alpha=0.5, scale=75)
         ax1.set_xlim(xmin, xmax)
         ax1.set_ylim(ymin, ymax)
         ax1.set_title(ensem_key)
@@ -145,25 +160,26 @@ for i in tqdm(range(num_ensem)):
         # ax2.set_xticks(np.arange(-np.pi, np.pi + np.pi/4, np.pi/4), minor=True)
         # ax2.set_xticklabels(['-180', '-90', '0', '90', '180'])
 
-        fig.savefig(join(plot_dir_ratemap, '%d.png'%(i)), dpi=200)
+        fig.savefig(join(plot_dir_ratemap, f'{ensem_key}.png'), dpi=200)
         plt.close(fig)
         # raise ValueError
+
+
 # Bayesian inference =============================
-
+num_ensem = len(xdict)
 xML, yML, aML, trajidML = [], [], [], []
-for i in tqdm(range(trajdf.shape[0])):
-    Xmat = trajdf['X'][i]
+for i in tqdm(range(alltrajdf.shape[0])):
 
-    if (Xmat.shape[0] < 1):
-        continue
+    fsigma = allfsigmalist[i]
+    X = createX(R, F, K, stored_f, fsigma)
 
-    if (i % 10 == 0):
+    if (i % 200 == 0):
 
         act_vec = np.zeros(num_ensem)
-        fnode_ids, sigma_ids = Sequences.X2sigma(Xmat, seqR, sigma_state=False)
+        fnode_ids, sigma_ids = Sequences.X2sigma(X, R, sigma_state=False)
         for fnode_id, sigma_id in zip(fnode_ids, sigma_ids):
             nodekey = id2fkey_dict[fnode_id]
-            ensem_key = '%s-%d'%(nodekey, sigma_id)
+            ensem_key = '%s_%d'%(nodekey, sigma_id)
             ratemap_id = ensemkey2id[ensem_key]
             act_vec[ratemap_id] = 1
 
@@ -183,8 +199,6 @@ for i in tqdm(range(trajdf.shape[0])):
         trajidML.append(i)
 
 BDresults = pd.DataFrame(dict(xML=xML, yML=yML, aML=aML,
-             xGT=trajdf['x'][trajidML].to_list(), yGT=trajdf['y'][trajidML].to_list(), aGT=trajdf['a'][trajidML].to_list()))
+             xGT=alltrajdf['x'][trajidML].to_list(), yGT=alltrajdf['y'][trajidML].to_list(), aGT=alltrajdf['a'][trajidML].to_list()))
 
-BDresults.to_pickle(join(data_dir, 'inferences.pickle'))
-
-
+BDresults.to_pickle(join(project_dir, 'inferences.pickle'))
