@@ -5,27 +5,16 @@ from scipy.signal import convolve
 from .comput_utils import midedges
 
 
-def DiceCoef(Jmat, X):
-    """
-    Parameters
-    ----------
-    Jmat : ndarray
-        Shape (N, F, K) with values [0, 1]
-    X : ndarray
-        Shape (F, K) with values [0, 1].
+def createX(R, F, K, stored_f, f_sigma):
+    X = np.zeros((F, K), dtype=int)
 
-    Returns
-    -------
-    Dice_Coefficient: ndarray
-        Shape (N, )
+    for key, sigmalist in f_sigma.items():
+        rowid = stored_f[key]
+        for sigma in sigmalist:
+            start_colid = sigma - 1  # sigma - 1
+            X[rowid, start_colid:start_colid + R] = 1
 
-    """
-    N, F, K = Jmat.shape
-
-    DC = (Jmat.reshape(N, -1) * X.reshape(1, -1)).sum(axis=1) / np.clip(Jmat.reshape(N, -1) + X.reshape(1, -1), a_min=0,
-                                                                        a_max=1).sum(axis=1)
-    return DC
-
+    return X
 
 class Sequences:
     def __init__(self, R: int, L: int, reobserve: bool = True):
@@ -50,17 +39,17 @@ class Sequences:
     def observe_f(self, f: list):
         for f_each in f:
             stored_f_keys = self.stored_f.keys()
-            if (f_each in stored_f_keys) and (f_each in self.current_f):
+            if (f_each in self.stored_f) and (f_each in self.current_f):
                 # The stored feature node is still in the view.
                 if self.reobserve:
                     self.f_sigma[f_each].append(0)  # Sigma stars with 0 because of the self.propagate_sigma() function.
 
-            elif (f_each in stored_f_keys) and (f_each not in self.current_f):
+            elif (f_each in self.stored_f) and (f_each not in self.current_f):
                 # The feature node exited the view before and now re-enters
                 # Start a new instance of the feature node
                 self.f_sigma[f_each].append(0)
 
-            elif f_each not in self.stored_f.keys():
+            elif f_each not in self.stored_f:
                 # A new feature node is found
                 self.stored_f[f_each] = self.num_f
                 self.f_sigma[f_each] = [0]
@@ -97,10 +86,10 @@ class Sequences:
 
     @staticmethod
     def X2sigma(Xmat, R, sigma_state=False):
-        kernel = np.ones((1, R))
-        sigma_mat = convolve(Xmat, kernel, mode='valid')
+        kernel = np.ones((1, R)).astype(int)
+        sigma_mat = convolve(Xmat.astype(int), kernel, mode='valid')
 
-        actnum = R-1 if sigma_state else 0
+        actnum = R-1 if sigma_state else 1e-8
 
         fnode_rids, sigma_states = np.where(sigma_mat > actnum)
 

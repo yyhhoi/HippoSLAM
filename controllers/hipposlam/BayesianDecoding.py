@@ -11,9 +11,6 @@ from matplotlib import cm
 from tqdm import tqdm
 from scipy.ndimage import gaussian_filter
 from scipy.special import factorial
-def logPois(r, k, epsilon=1e-6):
-    out = k * np.log(r+epsilon) - (r+epsilon) - factorial(k)
-    return out
 
 
 

@@ -21,9 +21,10 @@ import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 # Notes
-# - Fully superviosed:
+# - Fully superviosed: PPO3_FullySupervised_lr1_dp3_da8
 # - half-supervised: PPO5_OnlyCorrectLearnt_lr1_dp2_da12: Not successful aver. R ~ 0.2
-
+# - half-supervised: PPO4_HalfSupervised_lr1_dp3_da8: Not successful aver. R ~ 0.438
+# - unsupervised:
 
 def SB_PPO_Train():
     # Modes
@@ -33,31 +34,33 @@ def SB_PPO_Train():
     model_class = PPO
 
     # Paths
-    save_dir = join('data', 'StateMapLearnerTaughtForest_R5L40')
+    save_dir = join('data', 'StateMapLearnerTaughtForest_R5L20_dp2_da8')
     os.makedirs(save_dir, exist_ok=True)
-    load_model_name = 'PPO3_HalfSupervised_lr1_dp3_da8'
-    save_model_name = 'PPO4_HalfSupervised_lr1_dp3_da8'
+    load_model_name = 'PPO1_HalfSupervised'
+    save_model_name = 'PPO2_HalfSupervised'
     load_hipposlam_pth = join(save_dir, '%s_hipposlam.pickle' % load_model_name)
     load_model_pth = join(save_dir, '%s.zip'%(load_model_name))
     save_hipposlam_pth = join(save_dir, '%s_hipposlam.pickle' % save_model_name)
     save_model_pth = join(save_dir, '%s.zip' % (save_model_name))
-    save_record_pth = join(save_dir, '%s_TrainRecords.csv' % save_model_name)
+    save_record_pth = join(save_dir, '%s' % save_model_name)
+    save_trajdata_pth = join(save_dir, '%s_trajdata.pickle' % save_model_name)
+    # save_trajdata_pth = None
 
     # Environment
-    env = StateMapLearnerTaughtForest(R=5, L=40, spawn='all', goal='hard', max_episode_steps=350, use_ds=False,
-                                      save_hipposlam_pth=save_hipposlam_pth)
+    env = StateMapLearnerTaughtForest(R=5, L=20, spawn='all', goal='hard', max_episode_steps=350, use_ds=False,
+                                      save_hipposlam_pth=save_hipposlam_pth, save_trajdata_pth=save_trajdata_pth)
     info_keywords = ('Nstates', 'last_r', 'terminated', 'truncated', 'stuck', 'fallen', 'timeout')
     env = Monitor(env, save_record_pth, info_keywords=info_keywords)
     check_env(env)
 
-    # Save a checkpoint every ? steps
-    checkpoint_callback = CheckpointCallback(
-        save_freq=25000,
-        save_path=save_dir,
-        name_prefix="checkpoint",
-        save_replay_buffer=False,
-        save_vecnormalize=False,
-    )
+    # # Save a checkpoint every ? steps
+    # checkpoint_callback = CheckpointCallback(
+    #     save_freq=25000,
+    #     save_path=save_dir,
+    #     name_prefix="checkpoint",
+    #     save_replay_buffer=False,
+    #     save_vecnormalize=False,
+    # )
 
 
     # Load models
@@ -71,7 +74,7 @@ def SB_PPO_Train():
         model = model_class("MlpPolicy", env, verbose=1)
 
     # Train
-    model.learn(total_timesteps=2000000, callback=checkpoint_callback)
+    model.learn(total_timesteps=25000, callback=None)
 
     # Save models
     if save_model:
@@ -79,7 +82,6 @@ def SB_PPO_Train():
         env.unwrapped.save_hipposlam(save_hipposlam_pth)
 
     print('After training, there are %d states in the hippomap' % (env.hippomap.N))
-
 
 
 def OnlineA2C():
