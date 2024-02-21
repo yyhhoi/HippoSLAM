@@ -146,7 +146,7 @@ for i, ensem_key in enumerate(tqdm(xdict)):
 
 
         im1 = ax1.pcolormesh(BD.xedges, BD.yedges, ratemap_pos.T, cmap='jet')
-        ax1.scatter(fposeach[0], fposeach[1], color='g', s=100)
+        ax1.scatter(fposeach[0], fposeach[1], color='r', marker='x', s=100)
         r = 2
         # ax1.quiver(xsp, ysp, r* np.cos(asp), r*np.sin(asp), color='r', alpha=0.5, scale=75)
         ax1.set_xlim(xmin, xmax)
@@ -189,6 +189,7 @@ for i in tqdm(range(alltrajdf.shape[0])):
             k = act_vec[j]
             ratemap_epsilon = ratemap + 1e-7
             out = k * np.log(ratemap_epsilon) - ratemap_epsilon - factorial(k)
+            # out = k * np.log(ratemap + 1e-7) + (1-k) * np.log(1 - ratemap + 1e-7)
             logL += out
 
         maxid1D_logL = np.argmax(logL)
@@ -201,4 +202,4 @@ for i in tqdm(range(alltrajdf.shape[0])):
 BDresults = pd.DataFrame(dict(xML=xML, yML=yML, aML=aML,
              xGT=alltrajdf['x'][trajidML].to_list(), yGT=alltrajdf['y'][trajidML].to_list(), aGT=alltrajdf['a'][trajidML].to_list()))
 
-BDresults.to_pickle(join(project_dir, 'inferences.pickle'))
+BDresults.to_pickle(join(project_dir, 'inferences_bern.pickle'))
