@@ -535,9 +535,9 @@ class StateMapLearnerTaught(StateMapLearner):
                 _ = self.hippomap.learn_supervised(self.hipposeq.X, sid=sidpred)
                 # msg = 'Match    '
                 # print(f'{self.hippoteach.pred2gt_map[sidpred]} match {sidgt}. Learning happened' + "="*100)
-            # else:
-            #     # msg = 'NOT Match'
-            #     _ = self.hippomap.learn_supervised(self.hipposeq.X, sid=self.hippoteach.gt2pred_map[sidgt])
+            else:
+                # msg = 'NOT Match'
+                _ = self.hippomap.learn_supervised(self.hipposeq.X, sid=self.hippoteach.gt2pred_map[sidgt])
 
             # print(
             #     f'{msg} InferredState {sidpred}/{self.hippomap.N} (mappedGT={self.hippoteach.pred2gt_map[sidpred]} vs {sidgt}), val={Snodes[sidpred]}')
@@ -554,6 +554,8 @@ class StateMapLearnerTaught(StateMapLearner):
         # print()
         return sidpred, Snodes
 
+        # sidgt = int(np.random.choice(self.hippoteach.Nstates))
+        # _ = np.zeros(self.hippoteach.Nstates)
         # return sidgt, _
 
     def save_hipposlam(self, pth):
