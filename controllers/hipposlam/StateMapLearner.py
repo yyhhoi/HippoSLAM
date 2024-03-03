@@ -15,7 +15,7 @@ from hipposlam.Networks import MLP
 # from hipposlam.ReinforcementLearning import AWAC, A2C, compute_discounted_returns
 from hipposlam.Replay import ReplayMemoryAWAC, ReplayMemoryA2C
 from hipposlam.utils import breakroom_avoidance_policy, save_pickle, Recorder, read_pickle
-from hipposlam.Environments import StateMapLearner, StateMapLearnerTaughtForest, StateMapLearnerForest
+from hipposlam.Environments import StateMapLearner, StateMapLearnerTaught, EmbeddingLearner
 from os.path import join
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
@@ -28,7 +28,7 @@ os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 def SB_PPO_Train():
     # Modes
-    load_model = True
+    load_model = False
     save_model = True
     hippomap_learn = True
     model_class = PPO
@@ -36,8 +36,8 @@ def SB_PPO_Train():
     # Paths
     save_dir = join('data', 'StateMapLearnerTaughtForest_R5L20_dp2_da8')
     os.makedirs(save_dir, exist_ok=True)
-    load_model_name = 'PPO4_UnSupervised'
-    save_model_name = 'PPO5_UnSupervised'
+    load_model_name = ''
+    save_model_name = 'test'
     load_hipposlam_pth = join(save_dir, '%s_hipposlam.pickle' % load_model_name)
     load_model_pth = join(save_dir, '%s.zip'%(load_model_name))
     save_hipposlam_pth = join(save_dir, '%s_hipposlam.pickle' % save_model_name)
@@ -47,8 +47,8 @@ def SB_PPO_Train():
     # save_trajdata_pth = None
 
     # Environment
-    env = StateMapLearnerForest(R=5, L=20, spawn='all', goal='hard', max_episode_steps=350, use_ds=False,
-                                      save_hipposlam_pth=save_hipposlam_pth, save_trajdata_pth=save_trajdata_pth)
+    env = StateMapLearnerTaught(R=5, L=20, spawn='all', max_episode_steps=350, use_ds=False,
+                                     save_hipposlam_pth=save_hipposlam_pth, save_trajdata_pth=save_trajdata_pth)
     info_keywords = ('Nstates', 'last_r', 'terminated', 'truncated', 'stuck', 'fallen', 'timeout')
     env = Monitor(env, save_record_pth, info_keywords=info_keywords)
     check_env(env)
@@ -83,6 +83,39 @@ def SB_PPO_Train():
         env.unwrapped.save_hipposlam(save_hipposlam_pth)
 
     print('After training, there are %d states in the hippomap' % (env.hippomap.N))
+
+
+def SB_PPO_Train_Embedding():
+    # Modes
+    load_model = False
+    save_model = True
+    model_class = PPO
+
+    # Paths
+    save_dir = join('data', 'EmbeddingLearner')
+    os.makedirs(save_dir, exist_ok=True)
+    load_model_name = ''
+    save_model_name = 'test'
+    load_model_pth = join(save_dir, '%s.zip'%(load_model_name))
+    save_model_pth = join(save_dir, '%s.zip' % (save_model_name))
+
+    # Environment
+    env = EmbeddingLearner(embedding_dim=576, spawn='all', max_episode_steps=350, use_ds=False)
+
+    check_env(env)
+
+    # Load models
+    if load_model:
+        model = model_class.load(load_model_pth, env=env)
+    else:
+        model = model_class("MlpPolicy", env, verbose=1)
+
+    # Train
+    model.learn(total_timesteps=25000, callback=None)
+
+    # Save models
+    if save_model:
+        model.save(save_model_pth)
 
 
 def OnlineA2C():
@@ -463,8 +496,9 @@ def main():
     # naive_avoidance()
     # evaluate_trained_model()
     # fine_tune_trained_model()
-    SB_PPO_Train()
+    # SB_PPO_Train()
     # SB_PPO_Eval()
+    SB_PPO_Train_Embedding()
     return None
 
 if __name__ == '__main__':

@@ -10,10 +10,11 @@ import gymnasium as gym
 
 from .Sequences import Sequences, StateDecoder, StateTeacher
 from .utils import save_pickle, read_pickle, TrajWriter, Recorder
+from .vision import WebotImageConvertor, MobileNetEmbedder
 
 
-class BreakRoom(Supervisor, gym.Env):
-    def __init__(self, max_episode_steps=300, use_ds=True,  spawn='all', goal='hard'):
+class Forest(Supervisor, gym.Env):
+    def __init__(self, max_episode_steps=300, use_ds=True,  spawn='all'):
         super().__init__()
 
         # ====================== To be defined by child class ========================================
@@ -23,7 +24,6 @@ class BreakRoom(Supervisor, gym.Env):
 
         self.spec = gym.envs.registration.EnvSpec(id='WeBotsQ-v0', max_episode_steps=max_episode_steps)
         self.spawn_mode = spawn  # 'all' or 'start'
-        self.goal_mode = goal  # 'easy' or 'hard'
         self.use_ds = use_ds
 
         # Environment specific
@@ -46,11 +46,11 @@ class BreakRoom(Supervisor, gym.Env):
         self.x, self.y = None, None
         self.rotz, self.rota = None, None
         self.stuck_m = 0
-        self.stuck_epsilon = 0.0001
-        self.stuck_thresh = 10
+        self.stuck_epsilon = 0.001
+        self.stuck_thresh = 8.5
         self.fallen = False
         self.fallen_seq = 0
-        self.fallen_thresh = 0.4
+        self.fallen_thresh = 1
 
         # Distance sensor or bumper
         if self.use_ds:
@@ -204,77 +204,9 @@ class BreakRoom(Supervisor, gym.Env):
         return None
 
     def _check_goal(self, x, y):
-        if self.goal_mode == 'easy':
-            win = bool((x < 2) or (y < 0))
-        elif self.goal_mode == 'hard':
-            xgood = x < -4
-            ygood = (y > -2) & (y < -0.5)
-            win = bool(xgood and ygood)
-        else:
-            raise ValueError()
-        return win
-
-    def _get_intermediate_reward(self, x, y):
-        r_bonus = 0
-        if (y < -1.2) and (self.r_bonus_counts[0]<1):
-            r_bonus = 0.1
-            self.r_bonus_counts[0] += 1
-
-        if (x < 2) and (self.r_bonus_counts[1]<1):
-            r_bonus = 0.3
-            self.r_bonus_counts[1] += 1
-
-        if (x < 2) and (y > 1.3) and (self.r_bonus_counts[2]<1):
-            r_bonus = 0.5
-            self.r_bonus_counts[2] += 1
-
-        if (x < -3.3) and (self.r_bonus_counts[3]<1):
-            r_bonus = 0.7
-            self.r_bonus_counts[3] += 1
-
-        if r_bonus > 0:
-            print('Partial goal arrived! R bonus = %0.2f'%(r_bonus))
-        return r_bonus
-
-
-    def _spawn(self):
-        if self.spawn_mode == 'start':
-            x = np.random.uniform(3.45, 6.3, size=1)
-            y = np.random.uniform(1.35, 3.85, size=1)
-            a = np.random.uniform(-np.pi, np.pi, size=1)
-            z = 0.07
-        elif self.spawn_mode == 'all':
-            room = int(np.random.randint(0, 3))
-            a = np.random.uniform(-np.pi, np.pi, size=1)
-            z = 0.03
-            if room == 0:  # First room
-                x = np.random.uniform(3.45, 5.34, size=1)
-                y = np.random.uniform(-2.25, 4.60, size=1)
-            elif room == 1:  # Middle room
-                x = np.random.uniform(-1.35, 1.16, size=1)
-                y = np.random.uniform(-1.75, 3.92, size=1)
-            elif room == 2:  # transition between Middle and final room
-                x = np.random.uniform(-4.7, 1.68, size=1)
-                y = np.random.uniform(2.25, 4.03, size=1)
-            else:
-                raise ValueError()
-
-        else:
-            raise ValueError()
-        return float(x), float(y), z, float(a)
-
-    def _reset_pose(self):
-        x, y, z, a = self._spawn()
-        self._set_translation(x, y, z)  # 4.18, 2.82, 0.07
-        self._set_rotation(0, 0, -1, a)  # 0, 0, -1, 1.57
-
-        return x, y, a
-
-
-class Forest(BreakRoom):
-    def _check_goal(self, x, y):
         if (x < -13) and (y < -6.8):
             return True
+
 
     def _get_intermediate_reward(self, x, y):
         r_bonus = 0
@@ -292,6 +224,7 @@ class Forest(BreakRoom):
         if r_bonus > 0:
             print('Partial goal arrived! R bonus = %0.2f'%(r_bonus))
         return r_bonus
+
 
     def _spawn(self):
         # x, -15 - 7.5
@@ -318,29 +251,61 @@ class Forest(BreakRoom):
 
         return float(x), float(y), z, float(a)
 
+    def _reset_pose(self):
+        x, y, z, a = self._spawn()
+        self._set_translation(x, y, z)  # 4.18, 2.82, 0.07
+        self._set_rotation(0, 0, -1, a)  # 0, 0, -1, 1.57
 
-class OmniscientLearner(BreakRoom):
-    def __init__(self, max_episode_steps=1000, use_ds=True,  spawn='all', goal='hard'):
-        super(OmniscientLearner, self).__init__(max_episode_steps, use_ds, spawn, goal)
-        lowBox = np.array([-7, -3, -1, -1, -1, -1], dtype=np.float32)
-        highBox = np.array([7,  5,  1,  1, 1, 1], dtype=np.float32)
-        self.obs_dim = 6
-        self.observation_space = gym.spaces.Box(lowBox, highBox, shape=(self.obs_dim,))
+        return x, y, a
 
 
-class OmniscientLearnerForest(Forest, OmniscientLearner):
-    def __init__(self, max_episode_steps=1000, use_ds=True,  spawn='all', goal='hard'):
-        super(OmniscientLearnerForest, self).__init__(max_episode_steps, use_ds, spawn, goal)
+class OmniscientLearner(Forest):
+    def __init__(self, max_episode_steps=1000, use_ds=True,  spawn='all'):
+        super(OmniscientLearner, self).__init__(max_episode_steps, use_ds, spawn)
         lowBox = np.array([-16.5, -8.7, -1, -1, -1, -1], dtype=np.float32)
         highBox = np.array([8.7,  17,  1,  1, 1, 1], dtype=np.float32)
         self.obs_dim = 6
         self.observation_space = gym.spaces.Box(lowBox, highBox, shape=(self.obs_dim,))
 
 
-class StateMapLearner(BreakRoom):
+class EmbeddingLearner(Forest):
+    def __init__(self, embedding_dim, max_episode_steps=1000, use_ds=False,  spawn='all'):
+        super(EmbeddingLearner, self).__init__(max_episode_steps, use_ds, spawn)
+        lowBox = np.ones(embedding_dim).astype(np.float32) * -10.0
+        highBox = np.ones(embedding_dim).astype(np.float32) * 10.0
+        self.obs_dim = embedding_dim
+        self.observation_space = gym.spaces.Box(lowBox, highBox, shape=(self.obs_dim,))
+
+
+        # Camera
+        self.camera_timestep = self.thetastep
+        self.cam = self.getDevice('camera')
+        self.cam.enable(self.camera_timestep)
+        self.cam_width = self.cam.getWidth()
+        self.cam_height = self.cam.getHeight()
+
+        # Embedding
+        self.imgconverter = WebotImageConvertor(self.cam_height, self.cam_width)
+        self.imgembedder = MobileNetEmbedder()
+
+
+    def get_obs(self):
+
+        img_bytes = self.cam.getImage()
+        # out = self.cam.getImage()
+        # foo = np.array(bytearray(out))
+        # with open('byteImg', 'wb') as f:
+        #     f.write(out)
+        # breakpoint()
+        img_tensor = self.imgconverter.to_torch_RGB(img_bytes)
+        embedding = self.imgembedder.infer_embedding(img_tensor)
+        return embedding.numpy()
+
+
+class StateMapLearner(Forest):
     def __init__(self, R=5, L=10, max_episode_steps=1000, max_hipposlam_states=500, use_ds=True, spawn='all',
-                 goal='hard', save_hipposlam_pth=None, save_trajdata_pth=None):
-        super(StateMapLearner, self).__init__(max_episode_steps, use_ds, spawn, goal)
+                 save_hipposlam_pth=None, save_trajdata_pth=None):
+        super(StateMapLearner, self).__init__(max_episode_steps, use_ds, spawn)
         self.observation_space = gym.spaces.Discrete(max_hipposlam_states)
 
         # Camera
@@ -357,6 +322,7 @@ class StateMapLearner(BreakRoom):
         self.obj_dist = 3  # in meters
         self.hipposeq = Sequences(R=R, L=L, reobserve=False)
         self.hippomap = StateDecoder(R=R, L=L, maxN=max_hipposlam_states)
+        self.hippomap.set_lowSthresh(0.2)
         self.save_trajdata_pth = save_trajdata_pth
         self.SW = None
 
@@ -433,6 +399,12 @@ class StateMapLearner(BreakRoom):
     def recognize_objects(self):
         objs = self.cam.getRecognitionObjects()
 
+        # out = self.cam.getImage()
+        # foo = np.array(bytearray(out))
+        # foo2 = foo.reshape((self.cam_width, self.cam_height, 4))
+        # with open('byteImg', 'wb') as f:
+        #     f.write(out)
+        # breakpoint()
 
         idlist = [obj.getId() for obj in objs]
 
@@ -484,10 +456,10 @@ class StateMapLearner(BreakRoom):
 class StateMapLearnerTaught(StateMapLearner):
 
 
-    def __init__(self, R=5, L=10, max_episode_steps=1000, use_ds=True, spawn='all', goal='hard', save_hipposlam_pth=None, save_trajdata_pth=None):
+    def __init__(self, R=5, L=10, max_episode_steps=1000, use_ds=True, spawn='all', save_hipposlam_pth=None, save_trajdata_pth=None):
 
         super(StateMapLearnerTaught, self).__init__(R, L, max_episode_steps, 1, use_ds, spawn,
-                                                    goal, save_hipposlam_pth = save_hipposlam_pth, save_trajdata_pth= save_trajdata_pth)
+                                                    save_hipposlam_pth = save_hipposlam_pth, save_trajdata_pth= save_trajdata_pth)
 
         self.xbound = (-6.4, 8.4)
         self.ybound = (-8.6, 16.2)
@@ -517,14 +489,6 @@ class StateMapLearnerTaught(StateMapLearner):
 
 
         if self.hipposeq.X.sum() < 1e-6:
-            # print('X is zero. Learning skipped.')
-            # if self.hippoteach.match_groundtruth_storage(sidgt):
-            #     print(
-            #         f'InferredState {sidpred}/{self.hippomap.N} (mappedGT={self.hippoteach.pred2gt_map[sidpred]}), val={Snodes[sidpred]}')
-            # else:
-            #     print(
-            #         f'InferredState {sidpred}/{self.hippomap.N}')
-
             return sidpred, Snodes
 
         # print('GroundTruthState Storage = \n', self.hippoteach.pred2gt_map)
@@ -569,36 +533,15 @@ class StateMapLearnerTaught(StateMapLearner):
 
 
 
-class StateMapLearnerForest(StateMapLearner, Forest):
+
+
+
+
+class StateMapLearnerSnodes(StateMapLearner):
     def __init__(self, R=5, L=10, max_episode_steps=1000, max_hipposlam_states=500, use_ds=True, spawn='all',
-                 goal='hard', save_hipposlam_pth=None, save_trajdata_pth=None):
-        super(StateMapLearnerForest, self).__init__(R, L, max_episode_steps, max_hipposlam_states, use_ds, spawn, goal,
-                                                    save_hipposlam_pth=save_hipposlam_pth, save_trajdata_pth=save_trajdata_pth)
-        self.fallen_thresh = 1
-        self.stuck_epsilon = 1e-3
-        self.stuck_thresh = 8.5
-        self.hippomap.set_lowSthresh(0.2)
-
-
-
-class StateMapLearnerTaughtForest(StateMapLearnerTaught, Forest):
-    def __init__(self, R=5, L=10, max_episode_steps=1000, use_ds=True, spawn='all', goal='hard', save_hipposlam_pth=None, save_trajdata_pth=None):
-        super(StateMapLearnerTaughtForest, self).__init__(R, L, max_episode_steps, use_ds, spawn, goal,
-                                                          save_hipposlam_pth=save_hipposlam_pth, save_trajdata_pth=save_trajdata_pth)
-        self.fallen_thresh = 1
-        self.stuck_epsilon = 1e-3
-        self.stuck_thresh = 8.5
-        self.hippomap.set_lowSthresh(0.2)
-
-
-
-
-
-class StateMapLearnerForestSnodes(StateMapLearnerForest):
-    def __init__(self, R=5, L=10, max_episode_steps=1000, max_hipposlam_states=500, use_ds=True, spawn='all',
-                 goal='hard', save_hipposlam_pth=None):
-        super(StateMapLearnerForestSnodes, self).__init__(R, L, max_episode_steps, max_hipposlam_states, use_ds, spawn,
-                                                          goal, save_hipposlam_pth=save_hipposlam_pth)
+                 save_hipposlam_pth=None):
+        super(StateMapLearnerSnodes, self).__init__(R, L, max_episode_steps, max_hipposlam_states, use_ds, spawn,
+                                                          save_hipposlam_pth=save_hipposlam_pth)
         self.obs_dim = max_hipposlam_states
         lowBox = np.zeros(self.obs_dim).astype(np.float32)
         highBox = np.ones(self.obs_dim).astype(np.float32)

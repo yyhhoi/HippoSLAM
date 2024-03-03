@@ -5,9 +5,17 @@ EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/project
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/appearances/protos/Grass.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/garden/protos/DogHouse.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/trees/protos/Forest.proto"
-EXTERNPROTO "../protos/Cypress.proto"
 EXTERNPROTO "../protos/CypressSalient.proto"
 EXTERNPROTO "../protos/RockSalient.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/garden/protos/PicketFence.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/animals/protos/Cow.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/trees/protos/Pine.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/trees/protos/Oak.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/animals/protos/Horse.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/animals/protos/Sheep.proto"
+EXTERNPROTO "../protos/Windmill.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/buildings/protos/Barn.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/animals/protos/Fox.proto"
 
 WorldInfo {
   contactProperties [
@@ -20,8 +28,8 @@ WorldInfo {
   ]
 }
 Viewpoint {
-  orientation -0.6559149646589767 0.003540910396707862 0.7548264840941763 3.1334472552483335
-  position 3.2455978166116526 8.438699831358587 50.097816739081395
+  orientation -0.5229816413961136 0.013286095825557898 0.8522403900428218 3.0983033140009355
+  position 26.88131902123558 3.746901307455513 59.08069219515443
 }
 TexturedBackground {
 }
@@ -70,6 +78,22 @@ DEF GROUND Solid {
     }
     Pose {
       children [
+        Barn {
+          translation -1.81996 -4.94 0.19
+          rotation 0 0 1 1.5708
+          scale 0.2
+        }
+        Barn {
+          translation 10.29 -2.41998 0.19
+          rotation 0 0 1 -3.1415853071795863
+          scale 0.4
+          name "barn(1)"
+        }
+        Windmill {
+          translation -16.8797 4.8161 0
+          rotation 0 0 -1 -5.307179586466759e-06
+          enableBoundingObject FALSE
+        }
         DEF WALLs Group {
           children [
             Solid {
@@ -151,17 +175,17 @@ DEF GROUND Solid {
             CypressSalient {
               translation -0.72 8.94 0.34
               name "cypress tree scale 2.5"
-              scale 2.5
+              scale 1.2
             }
-            CypressSalient {
-              translation -13.29 -2.85 0.93
-              name "cypress tree scale 2.5(1)"
-              scale 2.5
+            Pine {
+              translation -5.09 -6.1 0.16
             }
-            CypressSalient {
-              translation -12.36 -9.4 0.04
-              name "cypress tree scale 2.5(3)"
-              scale 2.5
+            Pine {
+              translation -6.97 6.68 0.07
+              name "pine tree(1)"
+            }
+            Oak {
+              translation 0.56 12.8 0.06
             }
             CypressSalient {
               translation -17.51 -6.75 0.06
@@ -169,17 +193,17 @@ DEF GROUND Solid {
               scale 2.5
             }
             CypressSalient {
-              translation 0.65 -9.02 1.38
+              translation 8.85 -6.97 1.38
               name "cypress tree scale 2.5(4)"
-              scale 2.5
+              scale 1.8
             }
             CypressSalient {
               translation 5.12 -5.26 0.06
               name "cypress tree scale 2.5(5)"
-              scale 2.5
+              scale 0.8
             }
             CypressSalient {
-              translation 9.27 -3.48 0.09
+              translation 7.63 -9.66 0.09
               name "cypress tree scale 2.5(6)"
               scale 2.5
             }
@@ -189,79 +213,14 @@ DEF GROUND Solid {
               scale 2.5
             }
             CypressSalient {
-              translation 7.15 -0.39 1.38
-              name "cypress tree scale 2.5(26)"
-              scale 2.5
-            }
-            CypressSalient {
-              translation 7.18 -9.22 0.05
-              name "cypress tree scale 2.5(27)"
-              scale 2.5
-            }
-            CypressSalient {
-              translation -2.34 2.77 0.13
-              name "cypress tree scale 2.5(28)"
-              scale 2.5
-            }
-            CypressSalient {
-              translation -12.89 5.82 0.17
-              name "cypress tree scale 2.5(29)"
-              scale 2.5
-            }
-            CypressSalient {
-              translation 9.18 5.32 0.1
-              name "cypress tree scale 2.5(9)"
-              scale 2.5
-            }
-            CypressSalient {
               translation 9.03 13.95 0.04
               name "cypress tree scale 2.5(10)"
-              scale 2.5
+              scale 1.5
             }
             CypressSalient {
-              translation -1.82 -6.49 0.06
-              name "cypress tree scale 2.5(11)"
-              scale 2.5
-            }
-            CypressSalient {
-              translation -8.15 16.83 1.38
-              name "cypress tree scale 2.5(12)"
-              scale 2.5
-            }
-            CypressSalient {
-              translation -3.5 12.5 0.32
+              translation -12.91 -3.1 0.97
               name "cypress tree scale 2.5(25)"
-              scale 2.5
-            }
-            CypressSalient {
-              translation -0.38 17.06 1.38
-              name "cypress tree scale 2.5(13)"
-              scale 2.5
-            }
-            CypressSalient {
-              translation 3.76 17.21 0.06
-              name "cypress tree scale 2.5(14)"
-              scale 2.5
-            }
-            CypressSalient {
-              translation 6.06 10.7 0.52
-              name "cypress tree scale 2.5(24)"
-              scale 2.5
-            }
-            CypressSalient {
-              translation 1.72 13.36 0.52
-              name "cypress tree scale 2.5(21)"
-              scale 2.5
-            }
-            CypressSalient {
-              translation -6.96 7.11 0.52
-              name "cypress tree scale 2.5(7)"
-              scale 2.5
-            }
-            CypressSalient {
-              translation -6.97 -3.2 0.23
-              name "cypress tree scale 2.5(15)"
-              scale 2.5
+              scale 0.8
             }
             CypressSalient {
               translation -15.03 10.71 1.38
@@ -269,32 +228,17 @@ DEF GROUND Solid {
               scale 2.5
             }
             CypressSalient {
-              translation -13.28 14.79 0.19
-              name "cypress tree scale 2.5(17)"
-              scale 2.5
-            }
-            CypressSalient {
-              translation 1.07 -1.02 0.02
-              name "cypress tree scale 2.5(20)"
-              scale 2.5
-            }
-            CypressSalient {
-              translation -9.56 2.12 0.11
-              name "cypress tree scale 2.5(22)"
-              scale 2.5
-            }
-            CypressSalient {
-              translation 4.25 4.97 0.14
+              translation 4.25 4.97 0.1
               name "cypress tree scale 2.5(23)"
-              scale 2.5
+              scale 1.4
             }
           ]
         }
         DEF SalientRocks Group {
           children [
             RockSalient {
-              translation -8.15661 12.1052 1.965
-              rotation -0.4668220407596347 0.3582030312757826 0.8085590705977213 2.03099
+              translation -7.00894 11.5033 0.187395
+              rotation 0.3417991194664005 -0.007719942698291814 -0.9397413284605124 -2.268555307179586
               name "rock(2)"
               scale 6
             }
@@ -306,21 +250,133 @@ DEF GROUND Solid {
               scale 3
             }
             RockSalient {
+              translation 4.38376 -9.9748 0.06
+              rotation 0 0 1 2.8798
+              name "rock(4)"
+              type "flat"
+              scale 6
+            }
+            RockSalient {
               translation -11.5161 10.9894 0.17
               rotation 0 0 1 -1.047195307179586
               name "rock(11)"
               type "flat"
               scale 8
+              color 0.6 0.6 0.6
+            }
+            RockSalient {
+              translation 0.881653 -1.9041 0.524732
+              rotation 0.3779641520510403 0.6546542633605892 -0.6546532633601869 1.44547
+              name "rock(1)"
+              scale 12
+              color 0.482353 0.360784 0.360784
+            }
+            RockSalient {
+              translation -1.3136 3.18651 0.1061
+              name "rock(3)"
+              type "flat"
+              scale 2
+              color 0.482353 0.360784 0.360784
+            }
+            RockSalient {
+              translation -12.3736 5.82651 0.1061
+              name "rock(5)"
+              type "flat"
+              scale 4
+              color 0.756863 0.756863 0.737255
             }
           ]
         }
-        DEF TREES Group {
+        DEF Structures Group {
           children [
-            Cypress {
-              translation -11.39 16.58 0
-              name "cypress tree  scale 1(8)"
+            PicketFence {
+              translation -7.53 -2.84 0.01
+              numberOfSegments 3
+            }
+            PicketFence {
+              translation -15.63 0.879996 0.25
+              rotation 0 0 1 1.5708
+              name "picket fence(1)"
+              numberOfSegments 4
             }
           ]
+        }
+        Cow {
+          translation -10.633 17.504 0.05
+          rotation 0 0 -1 1.3089953071795861
+          scale 0.5
+        }
+        Cow {
+          translation 6.26577 18.0078 0
+          rotation 0 0 1 -2.8797853071795863
+          name "cow(1)"
+        }
+        Cow {
+          translation -7.85777 17.6522 0.08
+          rotation 0 0 1 -0.261795307179586
+          name "cow(3)"
+        }
+        Cow {
+          translation -11.5163 18.643 0.05
+          rotation 0 0 1 0.523602
+          scale 0.7
+          name "cow(2)"
+        }
+        Cow {
+          translation 4.32923 16.9218 -0.02
+          rotation 0 0 -1 1.04719
+          scale 0.7
+          name "cow(4)"
+        }
+        Horse {
+          translation 9.1 1.3 0.04
+          rotation 0 0 1 1.5708
+          colorBody 0.388235 0 0
+          colorHair 0.741176 0.678431 0.682353
+        }
+        Horse {
+          translation 0.879762 -8.73168 0.04
+          rotation 0 0 1 2.87979
+          scale 0.6
+          name "horse(2)"
+          colorBody 0.678431 0.321569 0.0666667
+          colorHair 0.741176 0.678431 0.682353
+        }
+        Horse {
+          translation 9.36935 9.653 0.04
+          rotation 0 0 1 2.09439
+          name "horse(3)"
+          colorBody 0.972549 0.486275 0
+          colorHair 0.741176 0.678431 0.682353
+        }
+        Horse {
+          translation 9.14243 3.01883 -0.04
+          rotation 0 0 1 -2.3561953071795863
+          scale 0.6
+          name "horse(1)"
+          colorBody 0.388235 0 0
+          colorHair 0.741176 0.678431 0.682353
+        }
+        Sheep {
+          translation -16.8863 -4.96986 -0.04
+          rotation 0 0 -1 -5.307179586466759e-06
+          scale 0.8
+        }
+        Sheep {
+          translation -17.1338 -1.86338 -0.04
+          rotation 0 0 -1 -0.5236053071795865
+          scale 1.5
+          name "sheep(1)"
+        }
+        Sheep {
+          translation -16.9874 -2.73848 -0.04
+          rotation 0 0 -1 -0.5236053071795865
+          name "sheep(2)"
+        }
+        Fox {
+          translation -1.84196 9.3083 0.17
+          rotation 0 0 -1 1.5708
+          scale 1.5
         }
         Forest {
           translation 0.85 -10.39 0
@@ -409,7 +465,7 @@ DEF AGENT Robot {
       ]
       endPoint DEF WHEEL4 Solid {
         translation -0.09999999999999956 -0.10999999999999943 -0.019999999999998228
-        rotation 0.9999999999999999 9.738477841676382e-10 -9.738243505807302e-10 1.5707999999899578
+        rotation 0.9999999999999999 7.576250572108961e-10 -7.576018198851852e-10 1.5707999999899533
         children [
           DEF WHEEL Shape {
             appearance PBRAppearance {
@@ -441,8 +497,8 @@ DEF AGENT Robot {
         }
       ]
       endPoint DEF WHEEL3 Solid {
-        translation -0.10000000000000021 0.11000000000000032 -0.019999999999999615
-        rotation 0.9999999999999999 8.737912942257698e-10 -8.73486814604926e-10 1.5707999999933655
+        translation -0.10000000000000021 0.11000000000000032 -0.019999999999999598
+        rotation 0.9999999999999999 8.737909605817359e-10 -8.734867949788074e-10 1.5707999999933626
         children [
           DEF WHEEL Shape {
             appearance PBRAppearance {
@@ -474,8 +530,8 @@ DEF AGENT Robot {
         }
       ]
       endPoint DEF WHEEL2 Solid {
-        translation 0.10000000000000002 -0.10999999999999943 -0.02000000000000013
-        rotation 0.9999999999999999 1.3315073987278212e-10 -1.3319211173308496e-10 1.5707999999928657
+        translation 0.10000000000000002 -0.10999999999999943 -0.020000000000000132
+        rotation 0.9999999999999999 -8.307124129109935e-11 8.303112550245655e-11 1.5707999999928592
         children [
           DEF WHEEL Shape {
             appearance PBRAppearance {
@@ -507,8 +563,8 @@ DEF AGENT Robot {
         }
       ]
       endPoint DEF WHEEL1 Solid {
-        translation 0.09999999999999956 0.11000000000000032 -0.019999999999998942
-        rotation 0.9999999999999999 -5.333774061748869e-10 5.338150686439359e-10 1.570799999989643
+        translation 0.09999999999999956 0.11000000000000032 -0.01999999999999894
+        rotation 0.9999999999999999 -5.333766211301005e-10 5.338151471484159e-10 1.570799999989638
         children [
           DEF WHEEL Shape {
             appearance PBRAppearance {
@@ -538,8 +594,8 @@ DEF AGENT Robot {
         }
         Camera {
           fieldOfView 2.356
-          width 640
-          height 240
+          width 256
+          height 256
           recognition Recognition {
             segmentation TRUE
           }
