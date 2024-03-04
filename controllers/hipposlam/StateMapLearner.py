@@ -87,15 +87,15 @@ def SB_PPO_Train():
 
 def SB_PPO_Train_Embedding():
     # Modes
-    load_model = False
+    load_model = True
     save_model = True
     model_class = PPO
 
     # Paths
     save_dir = join('data', 'EmbeddingLearner')
     os.makedirs(save_dir, exist_ok=True)
-    load_model_name = ''
-    save_model_name = 'test'
+    load_model_name = 'test2'
+    save_model_name = 'test3'
     load_model_pth = join(save_dir, '%s.zip'%(load_model_name))
     save_model_pth = join(save_dir, '%s.zip' % (save_model_name))
 

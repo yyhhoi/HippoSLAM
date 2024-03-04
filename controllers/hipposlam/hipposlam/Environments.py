@@ -30,7 +30,7 @@ class Forest(Supervisor, gym.Env):
         self.__timestep = int(self.getBasicTimeStep())  # default 32ms
         self.thetastep = self.__timestep * 32  # 32 * 32 = 1024 ms
         self.r_bonus_counts = [0] * 4
-        self.t = 0  # reset to 0, +1 every time self.step() is called
+        self.t = 0  # reset to 0, +1 every time self.step() is called.
         self.maxt = max_episode_steps
 
         # Supervisor
@@ -292,11 +292,6 @@ class EmbeddingLearner(Forest):
     def get_obs(self):
 
         img_bytes = self.cam.getImage()
-        # out = self.cam.getImage()
-        # foo = np.array(bytearray(out))
-        # with open('byteImg', 'wb') as f:
-        #     f.write(out)
-        # breakpoint()
         img_tensor = self.imgconverter.to_torch_RGB(img_bytes)
         embedding = self.imgembedder.infer_embedding(img_tensor)
         return embedding.numpy()
@@ -324,12 +319,12 @@ class StateMapLearner(Forest):
         self.hippomap = StateDecoder(R=R, L=L, maxN=max_hipposlam_states)
         self.hippomap.set_lowSthresh(0.2)
         self.save_trajdata_pth = save_trajdata_pth
-        self.SW = None
 
         # I/O
         if self.save_trajdata_pth:
             self.SW = Recorder('t', 'x', 'y', 'a', 'sid', 'r', 'terminated', 'truncated', 'fsigma')
-
+        else:
+            self.SW = None
 
     def get_obs_base(self):
         id_list = self.recognize_objects()

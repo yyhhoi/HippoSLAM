@@ -158,8 +158,21 @@ class StateDecoder:
         self.lr = lr
 
 
+        # Embedding
+        self.sid2embed = {}
+
+
+
     def set_lowSthresh(self, s):
         self.lowSThresh = s
+
+
+    def learn_embedding(self, X, embed):
+
+        if self.current_Sid in self.sid2embed:
+            embed_now = self.sid2embed[self.current_Sid]
+
+
 
 
     def learn_unsupervised(self, X):
@@ -206,6 +219,7 @@ class StateDecoder:
         if sid is None:
             self.N = self.J.expand_N(1)
             sid = self.N - 1
+        # Increment to the specified sid (supervised)
         self.J.increment(X * self.lr, sid)
         self.J.normalize_slice(sid, area=False)
         return sid
@@ -250,6 +264,9 @@ class StateDecoder:
     def infer_func(self, Jmat, X):
         Snodes = Jmat.reshape(self.N, self.current_F * self.K) @ X.flatten()
         return Snodes
+
+
+
 
 
 class StateTeacher:
