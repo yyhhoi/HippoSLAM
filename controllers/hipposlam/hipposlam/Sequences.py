@@ -1,7 +1,7 @@
 import numpy as np
 from pycircstat import cdiff
 from scipy.signal import convolve
-
+from collections import OrderedDict
 from .comput_utils import midedges
 
 
@@ -24,6 +24,7 @@ class Sequences:
         self.X = np.zeros((0, self.X_Ncol))
         self.stored_f = dict()  # mapped to the row id of X. ObjectID (str/int) to RowID of X (int)
         self.f_sigma = dict()  # ObjectID (str/int) to sigma (int)
+        self.far_fids = dict()
         self.current_f = []
         self.num_f = 0
         self.iter = 0
@@ -38,7 +39,6 @@ class Sequences:
 
     def observe_f(self, f: list):
         for f_each in f:
-            stored_f_keys = self.stored_f.keys()
             if (f_each in self.stored_f) and (f_each in self.current_f):
                 # The stored feature node is still in the view.
                 if self.reobserve:
@@ -52,6 +52,8 @@ class Sequences:
             elif f_each not in self.stored_f:
                 # A new feature node is found
                 self.stored_f[f_each] = self.num_f
+                if f_each[-1] == 'f':
+                    self.far_fids[f_each] = self.num_f
                 self.f_sigma[f_each] = [0]
                 self.num_f += 1
             else:
@@ -100,7 +102,7 @@ class Sequences:
 class MatrixJ:
 
     def __init__(self, N, F, K):
-        self.mat = np.zeros((N, F, K))
+        self.mat = np.zeros((N, F, K)).astype(float)
 
 
     def expand_F(self, num:int):
@@ -121,16 +123,6 @@ class MatrixJ:
         assert (X.shape[1] == self.mat.shape[2])  # same K
         self.mat[target_n, :, :] = self.mat[target_n, :, :] + X
 
-    def normalize(self, area=False):
-        N, F, K = self.mat.shape
-        assert N > 0
-        assert F > 0
-        if area:
-            norm = np.sum(np.sum(self.mat, axis=1), axis=1)
-        else:
-            norm = np.sqrt(np.sum(np.sum(self.mat ** 2, axis=1), axis=1))
-        self.mat = self.mat / norm.reshape(norm.shape[0], 1, 1)
-
 
     def normalize_slice(self, sid, area=False):
         N, F, K = self.mat.shape
@@ -140,7 +132,28 @@ class MatrixJ:
             norm = np.sum(self.mat[sid, :, :])
         else:
             norm = np.sqrt(np.sum(self.mat[sid, :, :] ** 2))
+            if norm == 0:
+                norm = 1
         self.mat[sid, :, :] = self.mat[sid, :, :] / norm
+
+    def normalize_slice_cuetypes(self, sid, far_ids):
+        N, F, K = self.mat.shape
+        assert N > 0
+        assert F > 0
+        if far_ids is None:
+            self.normalize_slice(sid, area=False)
+        else:
+            allFids = set(i for i in range(F))
+            close_ids = list(allFids.difference(far_ids))
+            far_norm = np.sum(self.mat[sid, far_ids, :]) * 2
+            close_norm = np.sum(self.mat[sid, close_ids, :]) * 2
+            if far_norm == 0:
+                far_norm = 1
+            if close_norm == 0:
+                close_norm = 1
+            self.mat[sid, far_ids, :] = self.mat[sid, far_ids, :] / far_norm
+            self.mat[sid, close_ids, :] = self.mat[sid, close_ids, :] / close_norm
+
 
 class StateDecoder:
     def __init__(self, R, L, maxN=500, lr=1):
@@ -159,21 +172,70 @@ class StateDecoder:
 
 
         # Embedding
-        self.sid2embed = {}
-
-
+        self.sid2embed = []
 
     def set_lowSthresh(self, s):
         self.lowSThresh = s
 
 
-    def learn_embedding(self, X, embed):
+    def learn_embedding(self, X, e_new, far_ids):
+        assert self.N == len(self.sid2embed)
 
-        if self.current_Sid in self.sid2embed:
-            embed_now = self.sid2embed[self.current_Sid]
+        # print('Far ids = \n', far_ids)
+
+        # Initial condition
+        if len(self.sid2embed) == 0:
+            self.current_Sid = self.learn_supervised(X, sid=None, far_ids=far_ids)
+            self.sid2embed.append(e_new.copy())
+            return None
 
 
+        e_mat = np.stack(self.sid2embed)  # -> (Nstates, Embed_dim)
 
+        # Cosine similarity. (Embed_dim, ) @ (Nstates, Embed_dim).T -> (Nstates, )
+        cossim = e_new @ (e_mat.T) / (np.linalg.norm(e_new) * np.linalg.norm(e_mat, axis=1) + 1e-9)
+        maxid = np.argmax(cossim)
+        maxcossim = cossim[maxid]
+
+        print('maxcossim = ', maxcossim)
+
+        if (maxcossim < self.lowSThresh) and (not self.reach_maximum()):  # Not matching any existing embeddings
+            # Create a new state, and remember the embedding
+            _ = self.learn_supervised(X, sid=None, far_ids=far_ids)
+            self.sid2embed.append(e_new.copy())
+            print(f'Learn new state = {self.N}')
+
+        else:
+            if maxid != self.current_Sid:
+
+                _ = self.learn_supervised(X, sid=maxid, far_ids=far_ids)
+
+            print(f'Learn old state = {self.current_Sid} to {maxid}')
+
+
+        return None
+
+    def learn_supervised(self, X, sid=None, far_ids=None):
+        """
+
+        Parameters
+        ----------
+        X : ndarray
+            2-d array with shape (F, K). F = Number of feature nodes. K = R + L - 1.
+
+        Returns
+        -------
+
+        """
+
+        # Create a new state node
+        if sid is None:
+            self.N = self.J.expand_N(1)
+            sid = self.N - 1
+        # Increment to the specified sid (supervised)
+        self.J.increment(X * self.lr, sid)
+        self.J.normalize_slice_cuetypes(sid, far_ids)
+        return sid
 
     def learn_unsupervised(self, X):
         """
@@ -201,28 +263,6 @@ class StateDecoder:
                 # Associate X with the  N-th node
                 X_norm = X / Xarea
                 self.J.increment(X_norm * self.lr, self.N - 1)
-
-    def learn_supervised(self, X, sid=None):
-        """
-
-        Parameters
-        ----------
-        X : ndarray
-            2-d array with shape (F, K). F = Number of feature nodes. K = R + L - 1.
-
-        Returns
-        -------
-
-        """
-
-        # Create a new state node
-        if sid is None:
-            self.N = self.J.expand_N(1)
-            sid = self.N - 1
-        # Increment to the specified sid (supervised)
-        self.J.increment(X * self.lr, sid)
-        self.J.normalize_slice(sid, area=False)
-        return sid
 
     def update_F(self, X):
         dF = X.shape[0] - self.J.mat.shape[1]

@@ -46,31 +46,11 @@ class MobileNetEmbedder(ImageEmbedder):
             x = self.model.features(batch_t)
             x = self.model.avgpool(x)
             embedding = torch.flatten(x)
-        return embedding
+        return embedding.numpy()
 
     def _get_model(self):
         weights = models.MobileNet_V3_Small_Weights.IMAGENET1K_V1
         model = models.mobilenet_v3_small(weights=weights)
-        model.eval()
-        preprocess = weights.transforms()
-        return model, preprocess
-
-class QuantizedMobileNetEmbedder(ImageEmbedder):
-    def infer_embedding(self, img_tensor):
-        batch_t = self.preprocess(img_tensor).unsqueeze(0)
-
-        # Get the features from the model
-        with torch.no_grad():
-            x = self.model.quant(batch_t)
-            x = self.model.features(x)
-            x = self.model.avgpool(x)
-            x = self.model.dequant(x)
-            embedding = torch.flatten(x)
-        return embedding
-
-    def _get_model(self):
-        weights = models.quantization.MobileNet_V3_Large_QuantizedWeights.IMAGENET1K_QNNPACK_V1
-        model = models.quantization.mobilenet_v3_large(weights=weights, quantize=True)
         model.eval()
         preprocess = weights.transforms()
         return model, preprocess

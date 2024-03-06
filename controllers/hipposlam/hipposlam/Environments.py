@@ -3,6 +3,8 @@ from os.path import join
 from pprint import PrettyPrinter
 
 import numpy as np
+from sklearn.decomposition import IncrementalPCA
+from sklearn.exceptions import NotFittedError
 from stable_baselines3.common.callbacks import CheckpointCallback
 
 from controller import Supervisor
@@ -66,7 +68,7 @@ class Forest(Supervisor, gym.Env):
         self.MAX_SPEED = 15
 
         # Action - 'Forward', 'left', 'right'
-        self.act_dim = 3
+        self.act_dim = 4
         self.action_space = gym.spaces.Discrete(self.act_dim)
         self.turn_steps = self.thetastep
         self.forward_steps = self.thetastep
@@ -75,6 +77,7 @@ class Forest(Supervisor, gym.Env):
             0: np.array([self.move_d, self.move_d]),  # Forward
             1: np.array([0, self.move_d]) * 0.5,  # Left turn
             2: np.array([self.move_d, 0]) * 0.5,  # Right turn
+            3: np.array([-self.move_d, -self.move_d]) * 0.2,  # Right turn
         }
 
 
@@ -393,14 +396,6 @@ class StateMapLearner(Forest):
 
     def recognize_objects(self):
         objs = self.cam.getRecognitionObjects()
-
-        # out = self.cam.getImage()
-        # foo = np.array(bytearray(out))
-        # foo2 = foo.reshape((self.cam_width, self.cam_height, 4))
-        # with open('byteImg', 'wb') as f:
-        #     f.write(out)
-        # breakpoint()
-
         idlist = [obj.getId() for obj in objs]
 
         # Distance from robot to the objects
@@ -446,6 +441,61 @@ class StateMapLearner(Forest):
         if 'fpos' in hippodata:
             self.fpos_dict = hippodata['fpos']
         return hippodata
+
+
+class StateMapLearnerEmbedding(StateMapLearner):
+    def __init__(self, R=5, L=10, max_episode_steps=1000, max_hipposlam_states=500, use_ds=True, spawn='all',
+                 save_hipposlam_pth=None, save_trajdata_pth=None):
+
+
+        super().__init__(R, L, max_episode_steps, max_hipposlam_states, use_ds, spawn,
+                         save_hipposlam_pth = save_hipposlam_pth, save_trajdata_pth= save_trajdata_pth)
+        # Embedding
+        self.imgconverter = WebotImageConvertor(self.cam_height, self.cam_width)
+        self.imgembedder = MobileNetEmbedder()
+        self.hippomap.set_lowSthresh(0.5)
+        self.n_components = 50
+        self.pca = IncrementalPCA(n_components=self.n_components)
+        self.embedding_buffer = []
+
+    def get_obs_base(self):
+        id_list = self.recognize_objects()
+        self.hipposeq.step(id_list)
+        sid, Snodes = self.hippomap.infer_state(self.hipposeq.X)
+
+
+        # Image embedding
+        if (self.hippomap.learn_mode) and (self.t % 5 == 0) and (self.hippomap.current_F > 0):
+            far_ids = list(self.hipposeq.far_fids.values())
+            img_bytes = self.cam.getImage()
+            img_tensor = self.imgconverter.to_torch_RGB(img_bytes)
+            embedding = self.imgembedder.infer_embedding(img_tensor)
+            self.embedding_buffer.append(embedding.copy())
+
+            if len(self.embedding_buffer) > self.n_components:
+                print('Partially fitting PCA')
+                self.pca.partial_fit(np.stack(self.embedding_buffer))
+                self.embedding_buffer = []
+                print(f'Total exlained variance = {self.pca.explained_variance_ratio_.sum()}')
+
+            try:
+                embedding_PC = self.pca.transform(embedding.reshape(1, -1))
+                self.hippomap.learn_embedding(self.hipposeq.X, embedding_PC.squeeze(), far_ids=far_ids)
+            except NotFittedError:
+                pass
+
+
+        # print('Interred state = %d   / %d  , val = %0.2f. F = %d, Xsum=%0.4f'%(sid+1, self.hippomap.N, Snodes[sid], self.hippomap.current_F, self.hipposeq.X.sum()))
+        return sid, Snodes
+
+    def save_hipposlam(self, pth):
+        print('Saving HippoSLAM at %s' % pth)
+        save_pickle(pth, dict(hipposeq=self.hipposeq, hippomap=self.hippomap,
+                              fpos=self.fpos_dict, pca=self.pca))
+
+    def load_hipposlam(self, pth):
+        hippodata = super().load_hipposlam(pth)
+        self.pca = hippodata['pca']
 
 
 class StateMapLearnerTaught(StateMapLearner):
