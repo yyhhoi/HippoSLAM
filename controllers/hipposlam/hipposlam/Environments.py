@@ -1,8 +1,10 @@
 import copy
+import os
 from os.path import join
 from pprint import PrettyPrinter
 
 import numpy as np
+from skimage.io import imsave
 from sklearn.decomposition import IncrementalPCA
 from sklearn.exceptions import NotFittedError
 from stable_baselines3.common.callbacks import CheckpointCallback
@@ -261,6 +263,58 @@ class Forest(Supervisor, gym.Env):
 
         return x, y, a
 
+class ImageSampler(Forest):
+
+    def __init__(self):
+        super().__init__(max_episode_steps=300, use_ds=False,  spawn='all')
+
+        # Camera
+        self.camera_timestep = self.thetastep
+        self.cam = self.getDevice('camera')
+        self.cam.enable(self.camera_timestep)
+        self.cam_width = self.cam.getWidth()
+        self.cam_height = self.cam.getHeight()
+
+        self.stuck_m = 0
+        self.stuck_epsilon = 0.001
+        self.stuck_thresh = 8
+        self.fallen = False
+        self.fallen_seq = 0
+        self.fallen_thresh = 0.6
+
+        self.translation_field.enableSFTracking(int(self.getBasicTimeStep()))
+        self.rotation_field.enableSFTracking(int(self.getBasicTimeStep()))
+
+        # image sampling specifics
+        self.save_img_dir = 'F:\VAE\imgs'
+        os.makedirs(self.save_img_dir, exist_ok=True)
+        self.save_annotation_pth = r'F:\VAE\annotations.csv'
+        self.c = 0
+        if not os.path.exists(self.save_annotation_pth):
+            with open(self.save_annotation_pth, 'w') as f:
+                f.write('c,x,y,a\n')
+
+    def get_obs(self):
+
+
+        if self.t % 5 == 0:
+            img_bytes = self.cam.getImage()
+            img = np.array(bytearray(img_bytes)).reshape(self.cam_height, self.cam_width, 4)
+            img = img[:, :, [2, 1, 0, 3]]
+
+            save_img_pth = join(self.save_img_dir, f'{self.c}.png')
+            imsave(save_img_pth, img)
+
+            x, y, _ = self._get_translation()
+            a = self._get_heading()
+            with open(self.save_annotation_pth, 'a') as f:
+                f.write(f'{self.c},{x:0.6f},{y:0.6f},{a:0.6f}\n')
+
+            self.c += 1
+
+
+        return 0
+
 
 class OmniscientLearner(Forest):
     def __init__(self, max_episode_steps=1000, use_ds=True,  spawn='all'):
@@ -269,6 +323,8 @@ class OmniscientLearner(Forest):
         highBox = np.array([8.7,  17,  1,  1, 1, 1], dtype=np.float32)
         self.obs_dim = 6
         self.observation_space = gym.spaces.Box(lowBox, highBox, shape=(self.obs_dim,))
+
+
 
 
 class EmbeddingLearner(Forest):

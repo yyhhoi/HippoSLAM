@@ -102,3 +102,71 @@ class MLP(nn.Module):
         for layer in self.layers:
             xs = layer(xs)
         return xs
+
+
+
+class VAE(nn.Module):
+    def __init__(self, input_dim, hidden_dim, bottleneck_dim):
+        super().__init__()
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+        self.bottleneck_dim = bottleneck_dim
+
+        self.encoder = nn.Sequential(
+            nn.Linear(self.input_dim, self.hidden_dim),
+            nn.LeakyReLU(),
+        )
+
+        self.bottleneck_mu = nn.Sequential(
+            nn.Linear(self.hidden_dim, self.bottleneck_dim),
+        )
+
+        self.bottleneck_logvar = nn.Sequential(
+            nn.Linear(self.hidden_dim, self.bottleneck_dim),
+        )
+
+        self.decoder = nn.Sequential(
+            nn.Linear(self.bottleneck_dim, self.hidden_dim),
+            nn.LeakyReLU(),
+            nn.Linear(self.hidden_dim, self.input_dim),
+        )
+
+    def reparametrize(self, mu, log_var):
+        std = torch.exp(0.5 * log_var)
+        eps = torch.randn_like(std)
+        return mu + eps * std
+
+    def forward(self, x):
+        """
+
+        Parameters
+        ----------
+        x : torch.tensor
+            (batch_size, input_dim) torch.flaot32. Image Embeddings.
+
+        Returns
+        -------
+        y : torch.tensor
+            (batch_size, input_dim) torch.flaot32. Reconstructed image Embeddings.
+        mu : torch.tensor
+            (batch_size, bottleneck_dim) torch.flaot32. Means.
+        logvar : torch.tensor
+            (batch_size, bottleneck_dim) torch.flaot32. Log variance.
+        """
+        x = self.encoder(x)  # (batch_size, input_dim) -> (batch_size, hidden_dim)
+        mu = self.bottleneck_mu(x)  # (batch_size, hidden_dim) -> (batch_size, bottleneck_dim)
+        logvar = self.bottleneck_logvar(x)  # (batch_size, hidden_dim) -> (batch_size, bottleneck_dim)
+        sampled = self.reparametrize(mu, logvar)  # (batch_size, bottleneck_dim)
+        y = self.decoder(sampled)  # (batch_size, bottleneck_dim) -> (batch_size, input_dim)
+        return y, mu, logvar
+
+    def sample(self, Nsamps):
+        with torch.no_grad():
+            sampled = torch.randn((Nsamps, self.hidden_dim))
+            y = self.decoder(sampled)
+        return y
+
+
+
+
+

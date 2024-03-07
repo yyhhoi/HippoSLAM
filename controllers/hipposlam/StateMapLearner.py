@@ -15,7 +15,7 @@ from hipposlam.Networks import MLP
 # from hipposlam.ReinforcementLearning import AWAC, A2C, compute_discounted_returns
 from hipposlam.Replay import ReplayMemoryAWAC, ReplayMemoryA2C
 from hipposlam.utils import breakroom_avoidance_policy, save_pickle, Recorder, read_pickle
-from hipposlam.Environments import StateMapLearner, StateMapLearnerTaught, EmbeddingLearner, StateMapLearnerEmbedding
+from hipposlam.Environments import StateMapLearner, StateMapLearnerTaught, EmbeddingLearner, StateMapLearnerEmbedding, ImageSampler
 from os.path import join
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
@@ -116,6 +116,29 @@ def SB_PPO_Train_Embedding():
     # Save models
     if save_model:
         model.save(save_model_pth)
+
+
+def ImageSampling():
+
+    env = ImageSampler()
+    max_img_num = 10000
+    env.c = 5023
+    while env.c < max_img_num:
+        print(r'%d/%d'%(env.c, max_img_num), end='', flush=True)
+        env.reset()
+
+        terminated = False
+        truncated = False
+
+        while (not terminated) and (not truncated):
+            s, reward, terminated, truncated, info = env.step(np.random.choice(4))
+
+
+
+
+
+
+
 
 
 def OnlineA2C():
@@ -496,7 +519,8 @@ def main():
     # naive_avoidance()
     # evaluate_trained_model()
     # fine_tune_trained_model()
-    SB_PPO_Train()
+    # SB_PPO_Train()
+    ImageSampling()
     # SB_PPO_Eval()
     # SB_PPO_Train_Embedding()
     return None
