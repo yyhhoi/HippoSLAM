@@ -177,9 +177,8 @@ def get_dataloaders(load_annotation_pth, load_embed_dir):
     return train_dataloader, test_dataloader, train_dataset, test_dataset
 
 def TrainVAE(kld_mul=0.01):
-    # data_dir = 'F:\VAE'
 
-    model_tag = f'kldmul={kld_mul:0.6f}_bottle3'
+    model_tag = f'kldmul={kld_mul:0.6f}_bottle50'
     data_dir = join('data', 'VAE')
     load_embed_dir = join(data_dir, 'embeds')
     load_annotation_pth = join(data_dir, 'annotations.csv')
@@ -194,7 +193,7 @@ def TrainVAE(kld_mul=0.01):
     # Model
     vaelearner = VAELearner(
         input_dim=576,
-        hidden_dims=[400, 200, 100, 50, 25, 10, 3],
+        hidden_dims=[400, 200, 100, 50],
         kld_mul=kld_mul,
         lr=0.001,
         lr_gamma=0.95,
@@ -202,7 +201,7 @@ def TrainVAE(kld_mul=0.01):
     )
 
     # Training
-    num_epoches = 10
+    num_epoches = 20
     keys = [f'{a}_{b}' for a in ['recon', 'kld'] for b in ['train', 'test']]
     loss_recorder = Recorder(*(keys + ['lr']))
     for ei in tqdm(range(num_epoches)):
