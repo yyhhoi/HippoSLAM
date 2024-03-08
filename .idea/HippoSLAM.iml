@@ -5,10 +5,8 @@
     <content url="file://$MODULE_DIR$">
       <excludeFolder url="file://$MODULE_DIR$/controllers/hipposlam/data" />
       <excludeFolder url="file://$MODULE_DIR$/controllers/hipposlam/plots" />
-      <excludeFolder url="file://$MODULE_DIR$/controllers/hipposlam/data/StateMapLearnerTaughtForest_R5L40_dp3_da8" />
     </content>
-    <content url="file://$MODULE_DIR$/controllers/hipposlam/data/StateMapLearnerTaughtForest_R5L40_dp3_da8" />
-    <orderEntry type="jdk" jdkName="Local Python 3.8 (base)" jdkType="Python SDK" />
+    <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="PackageRequirementsSettings">

@@ -1,8 +1,11 @@
 import os
 
 from matplotlib import pyplot as plt
+from torch.optim.lr_scheduler import ExponentialLR
 from torchvision import models
+from tqdm import tqdm
 
+from hipposlam.utils import Recorder
 from hipposlam.Networks import VAE
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
@@ -100,9 +103,10 @@ def convert_to_embed():
 
 
 class VAELearner:
-    def __init__(self, kld_mul=0.01, lr=0.001, weight_decay=0, input_dim=576, hidden_dim=256, bottleneck_dim=50):
-        self.vae = VAE(input_dim, hidden_dim, bottleneck_dim)
+    def __init__(self, input_dim, hidden_dims, kld_mul=0.01, lr=0.001, lr_gamma=0.9, weight_decay=0):
+        self.vae = VAE(input_dim, hidden_dims)  # input_dim = 576
         self.vae_opt = torch.optim.Adam(params=self.vae.parameters(), lr=lr, weight_decay=weight_decay)
+        self.lr_opt = ExponentialLR(self.vae_opt, gamma=lr_gamma)
         self.kld_mul = kld_mul
 
     def train(self, x):
@@ -119,15 +123,25 @@ class VAELearner:
 
         """
 
+        loss, (recon_loss, kld_loss), _ = self._forward_pass(x)
+        self.vae_opt.zero_grad()
+        loss.backward()
+        self.vae_opt.step()
+        return loss.item(), (recon_loss.item(), kld_loss.item())
+
+    def infer(self, x):
+        with torch.no_grad():
+            loss, (recon_loss, kld_loss), (y, mu, logvar) = self._forward_pass(x)
+        return loss.item(), (recon_loss.item(), kld_loss.item()), (y.detach(), mu.detach(), logvar.detach())
+
+
+    def _forward_pass(self, x):
         y, mu, logvar = self.vae(x)
         recon_loss = nn.functional.mse_loss(y, x)
         kld_loss = self.kld(mu, logvar)
         loss = recon_loss + self.kld_mul * kld_loss
-        self.vae_opt.zero_grad()
-        loss.backward()
-        self.vae_opt.step()
+        return loss, (recon_loss, kld_loss), (y, mu, logvar)
 
-        return loss.item(), (recon_loss.item(), kld_loss.item())
 
 
     @staticmethod
@@ -140,6 +154,7 @@ class VAELearner:
             'vae_state_dict': self.vae.state_dict(),
             'vae_opt_state_dict': self.vae_opt.state_dict(),
             'kld_mul': self.kld_mul,
+            'lr_opt': self.lr_opt.state_dict(),
         }
         torch.save(ckpt_dict, pth)
 
@@ -147,56 +162,117 @@ class VAELearner:
         checkpoint = torch.load(pth)
         self.vae.load_state_dict(checkpoint['vae_state_dict'])
         self.vae_opt.load_state_dict(checkpoint['vae_opt_state_dict'])
+        self.lr_opt.load_state_dict(checkpoint['lr_opt'])
         self.kld_mul = checkpoint['kld_mul']
 
 
 
+def get_dataloaders(load_annotation_pth, load_embed_dir):
 
-
-
-def TrainVAE():
-    data_dir = 'F:\VAE'
-    # data_dir = 'data\VAE'
-    load_embed_dir = join(data_dir, 'embeds')
-    load_annotation_pth = join(data_dir, 'annotations.csv')
-    save_plot_dir = join(data_dir, 'plots')
-    os.makedirs(save_plot_dir, exist_ok=True)
-    save_ckpt_pth = join(data_dir, 'ckpt.pt')
-
-
-    # Prepare datasets
     dataset = EmbeddingImageDataset(load_annotation_pth, load_embed_dir)
     generator1 = torch.Generator().manual_seed(0)
     train_dataset, test_dataset = random_split(dataset, [8000, 2003], generator=generator1)
-    train_dataloader = DataLoader(train_dataset, batch_size=64, shuffle=True)
+    train_dataloader = DataLoader(train_dataset, batch_size=256, shuffle=True)
+    test_dataloader = DataLoader(test_dataset, batch_size=1024, shuffle=True)
+    return train_dataloader, test_dataloader, train_dataset, test_dataset
+
+def TrainVAE(kld_mul=0.01):
+    # data_dir = 'F:\VAE'
+
+    model_tag = f'kldmul={kld_mul:0.6f}_bottle3'
+    data_dir = join('data', 'VAE')
+    load_embed_dir = join(data_dir, 'embeds')
+    load_annotation_pth = join(data_dir, 'annotations.csv')
+
+    save_dir = join(data_dir, 'model', model_tag)
+    os.makedirs(save_dir, exist_ok=True)
+    save_ckpt_pth = join(save_dir, 'ckpt_%s.pt'%model_tag)
+
+    # Prepare datasets
+    train_dataloader, test_dataloader, train_dataset, test_dataset = get_dataloaders(load_annotation_pth, load_embed_dir)
+
     # Model
-    vaelearner = VAELearner(kld_mul=0.01,
-                            lr=0.001,
-                            weight_decay=0)
+    vaelearner = VAELearner(
+        input_dim=576,
+        hidden_dims=[400, 200, 100, 50, 25, 10, 3],
+        kld_mul=kld_mul,
+        lr=0.001,
+        lr_gamma=0.95,
+        weight_decay=0
+    )
 
     # Training
-    vaelearner.vae.train()
-    num_epoches = 100
-    loss_log = {'recon':[], 'kld':[]}
-    for ei in range(num_epoches):
+    num_epoches = 10
+    keys = [f'{a}_{b}' for a in ['recon', 'kld'] for b in ['train', 'test']]
+    loss_recorder = Recorder(*(keys + ['lr']))
+    for ei in tqdm(range(num_epoches)):
         print('\rTraining epoch %d/%d'%(ei, num_epoches), flush=True, end='')
-        losstmp = {'recon':[], 'kld':[]}
+        epoch_recorder = Recorder(*keys)
+
+        # Training
+        vaelearner.vae.train()
         for x_train, _ in iter(train_dataloader):
-            loss, (recon_loss, kld_loss) = vaelearner.train(x_train)
+            loss_train, (recon_loss_train, kld_loss_train) = vaelearner.train(x_train)
+            epoch_recorder.record(recon_train=recon_loss_train, kld_train=kld_loss_train)
 
-
-
-        loss_log['recon'].append(recon_loss)
-        loss_log['kld'].append(kld_loss)
+        # Testing
+        vaelearner.vae.eval()
+        for x_test, _ in iter(test_dataloader):
+            loss_test, (recon_loss_test, kld_loss_test), _ = vaelearner.infer(x_test)
+            epoch_recorder.record(recon_test=recon_loss_test, kld_test=kld_loss_test)
+        avers_dict = epoch_recorder.return_avers()
+        loss_recorder.record(**avers_dict)
+        loss_recorder.record(lr=vaelearner.lr_opt.get_last_lr()[0])
+        vaelearner.lr_opt.step()
     vaelearner.save_checkpoint(save_ckpt_pth)
 
     # Plot loss
-    fig, ax = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+    fig, ax = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
+    ax[0].plot(loss_recorder['recon_train'], label='recon_train')
+    ax[0].plot(loss_recorder['recon_test'], label='recon_test')
+    ax[0].set_title('train=%0.6f, test=%0.6f'% (loss_recorder['recon_train'][-1], loss_recorder['recon_test'][-1]))
+    ax[0].legend()
+    ax[1].plot(loss_recorder['kld_train'], label='kld_train')
+    ax[1].plot(loss_recorder['kld_test'], label='kld_test')
+    ax[1].set_title('train=%0.6f, test=%0.6f' % (loss_recorder['kld_train'][-1], loss_recorder['kld_test'][-1]))
+    ax[1].legend()
+    for axeach in ax[:2]:
+        axeach.set_ylim(0, None)
+    ax[2].plot(loss_recorder['lr'], marker='x')
+    ax[2].set_xlabel('Epoch')
+    ax[2].set_ylabel('Learning rate')
+    fig.savefig(join(save_dir, f'Losses_{model_tag}.png'), dpi=300)
+    plt.close(fig)
 
-    ax[0].plot(loss_log['recon'])
-    ax[1].plot(loss_log['kld'])
-    fig.savefig(join(save_plot_dir, 'Losses.png'), dpi=300)
+    # Plot examples
+    vaelearner.vae.eval()
+
+
+    x_test, _ = next(iter(test_dataloader))
+    nexamples = 2
+    fig, ax = plt.subplots(nexamples, 1, figsize=(16, 8), sharex=True)
+
+    x_ax = np.arange(x_test.shape[1])
+    for i in range(nexamples):
+        xtest, _ = test_dataset[i]
+        loss_test, (recon_loss_test, kld_loss_test), (y, mu, logvar) = vaelearner.infer(xtest.unsqueeze(0))
+
+        ax[i].step(x_ax, x_test[0, :], color='r', label='input', linewidth=1)
+        ax[i].step(x_ax, y[0, :], color='b', label='output', linewidth=1)
+
+    ax[0].legend()
+    fig.tight_layout()
+    fig.savefig(join(save_dir, f'pred_examples_{model_tag}.png'), dpi=300)
+    plt.close(fig)
+
+
+
+
 
 if __name__ == "__main__":
 
-    TrainVAE()
+    for kld_mul in [0.1, 0.01, 0.001]:
+        print(f'\n {kld_mul:0.6f}')
+        TrainVAE(kld_mul)
+        print()
+    # infer_examples()

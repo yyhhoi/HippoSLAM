@@ -38,6 +38,9 @@ class Recorder:
         for key, val in kwargs.items():
             self.records_dict[key].append(val)
 
+    def return_avers(self):
+        return {key:np.mean(val) for key, val in self.records_dict.items()}
+
     def to_csv(self, save_pth):
         self.records_df = pd.DataFrame(self.records_dict)
         self.records_df.to_csv(save_pth)
@@ -57,7 +60,8 @@ class Recorder:
         save_pickle(data_pth, [self.records_dict])
 
 
-
+    def __getitem__(self, key):
+        return self.records_dict[key]
 
 
 class TrajWriter:

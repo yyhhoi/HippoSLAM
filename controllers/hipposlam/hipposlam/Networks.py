@@ -106,30 +106,43 @@ class MLP(nn.Module):
 
 
 class VAE(nn.Module):
-    def __init__(self, input_dim, hidden_dim, bottleneck_dim):
+    def __init__(self, input_dim, hidden_dims):
         super().__init__()
-        self.input_dim = input_dim
-        self.hidden_dim = hidden_dim
-        self.bottleneck_dim = bottleneck_dim
+        self.input_dim = input_dim  # 576
+        self.hidden_dims = hidden_dims
 
-        self.encoder = nn.Sequential(
-            nn.Linear(self.input_dim, self.hidden_dim),
-            nn.LeakyReLU(),
-        )
+        dims = [self.input_dim] + self.hidden_dims
+        encoding_layers = []
+        for i in range(len(dims)-3):
+            input_dim, output_dim = dims[i], dims[i+1]
+            encoding_layers.append(nn.Linear(input_dim, output_dim))
+            encoding_layers.append(nn.LeakyReLU())
+            encoding_layers.append(nn.BatchNorm1d(num_features=output_dim))
+        encoding_layers.append(nn.Linear(dims[-3], dims[-2]))
+
+
+
+        self.encoder = nn.Sequential(*encoding_layers)
+
 
         self.bottleneck_mu = nn.Sequential(
-            nn.Linear(self.hidden_dim, self.bottleneck_dim),
+            nn.Linear(dims[-2], dims[-1]),
         )
 
         self.bottleneck_logvar = nn.Sequential(
-            nn.Linear(self.hidden_dim, self.bottleneck_dim),
+            nn.Linear(dims[-2], dims[-1]),
         )
 
-        self.decoder = nn.Sequential(
-            nn.Linear(self.bottleneck_dim, self.hidden_dim),
-            nn.LeakyReLU(),
-            nn.Linear(self.hidden_dim, self.input_dim),
-        )
+
+        decoding_layers = []
+        for i in reversed(range(2, len(dims))):
+            input_dim, output_dim = dims[i], dims[i - 1]
+            decoding_layers.append(nn.Linear(input_dim, output_dim))
+            decoding_layers.append(nn.LeakyReLU())
+            decoding_layers.append(nn.BatchNorm1d(num_features=output_dim))
+        decoding_layers.append(nn.Linear(dims[1], dims[0]))
+
+        self.decoder = nn.Sequential(*decoding_layers)
 
     def reparametrize(self, mu, log_var):
         std = torch.exp(0.5 * log_var)
