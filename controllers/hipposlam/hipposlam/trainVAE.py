@@ -162,7 +162,7 @@ def get_dataloaders(load_annotation_pth, load_embed_dir):
 
     dataset = EmbeddingImageDatasetAll(load_annotation_pth, load_embed_dir)
     generator1 = torch.Generator().manual_seed(0)
-    train_dataset, test_dataset = random_split(dataset, [8000, 2003], generator=generator1)
+    train_dataset, test_dataset = random_split(dataset, [8000, 2032], generator=generator1)
     train_dataloader = DataLoader(train_dataset, batch_size=256, shuffle=True)
     test_dataloader = DataLoader(test_dataset, batch_size=1024, shuffle=True)
     return train_dataloader, test_dataloader, train_dataset, test_dataset
