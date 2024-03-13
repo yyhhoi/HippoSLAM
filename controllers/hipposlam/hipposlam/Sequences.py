@@ -207,10 +207,11 @@ class StateDecoder:
 
         else:
             if maxid != self.current_Sid:
-
                 _ = self.learn_supervised(X, sid=maxid, far_ids=far_ids)
+                print(f'Learn old state = {self.current_Sid} to {maxid}')
+            else:
+                print(f'Correct state prediction {self.current_Sid} to {maxid}')
 
-            print(f'Learn old state = {self.current_Sid} to {maxid}')
 
 
         return None

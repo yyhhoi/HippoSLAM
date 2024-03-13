@@ -6,7 +6,7 @@
       <excludeFolder url="file://$MODULE_DIR$/controllers/hipposlam/data" />
       <excludeFolder url="file://$MODULE_DIR$/controllers/hipposlam/plots" />
     </content>
-    <orderEntry type="inheritedJdk" />
+    <orderEntry type="jdk" jdkName="hipposlam" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="PackageRequirementsSettings">

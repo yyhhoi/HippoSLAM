@@ -4,6 +4,7 @@ from os.path import join
 from pprint import PrettyPrinter
 
 import numpy as np
+import torch
 from skimage.io import imsave
 from sklearn.decomposition import IncrementalPCA
 from sklearn.exceptions import NotFittedError
@@ -15,6 +16,7 @@ import gymnasium as gym
 from .Sequences import Sequences, StateDecoder, StateTeacher
 from .utils import save_pickle, read_pickle, TrajWriter, Recorder
 from .vision import WebotImageConvertor, MobileNetEmbedder
+from .trainVAE import VAELearner
 
 
 class Forest(Supervisor, gym.Env):
@@ -170,7 +172,7 @@ class Forest(Supervisor, gym.Env):
             if self.fallen_seq > 5:
                 self.fallen_seq = 0
                 self._set_rotation(0, 0, -1, 1.57)
-                breakpoint()
+                # breakpoint()
         self.fallen = fallen
 
         # Timelimit reached
@@ -269,7 +271,7 @@ class ImageSampler(Forest):
         super().__init__(max_episode_steps=300, use_ds=False,  spawn='all')
 
         # Camera
-        self.camera_timestep = self.thetastep
+        self.camera_timestep = int(self.getBasicTimeStep())
         self.cam = self.getDevice('camera')
         self.cam.enable(self.camera_timestep)
         self.cam_width = self.cam.getWidth()
@@ -286,9 +288,9 @@ class ImageSampler(Forest):
         self.rotation_field.enableSFTracking(int(self.getBasicTimeStep()))
 
         # image sampling specifics
-        self.save_img_dir = 'F:\VAE\imgs'
+        self.save_img_dir = 'data\VAE\imgs2'
         os.makedirs(self.save_img_dir, exist_ok=True)
-        self.save_annotation_pth = r'F:\VAE\annotations.csv'
+        self.save_annotation_pth = r'data\VAE\annotations2.csv'
         self.c = 0
         if not os.path.exists(self.save_annotation_pth):
             with open(self.save_annotation_pth, 'w') as f:
@@ -298,6 +300,7 @@ class ImageSampler(Forest):
 
 
         if self.t % 5 == 0:
+            print('Save image and data. c=%d'%self.c)
             img_bytes = self.cam.getImage()
             img = np.array(bytearray(img_bytes)).reshape(self.cam_height, self.cam_width, 4)
             img = img[:, :, [2, 1, 0, 3]]
@@ -450,7 +453,7 @@ class StateMapLearner(Forest):
 
         return obs, reward, terminated, truncated, info
 
-    def recognize_objects(self):
+    def recognize_objects(self, only_close=False):
         objs = self.cam.getRecognitionObjects()
         idlist = [obj.getId() for obj in objs]
 
@@ -479,7 +482,9 @@ class StateMapLearner(Forest):
                 # print('Close object %d added'%(objid))
                 IDlist_out.append('%d_c'%(objid))
             else:
-                IDlist_out.append('%d_f'%(objid))
+                if not only_close:
+                    IDlist_out.append('%d_f'%(objid))
+
         # id_list = []
         # for c in closeIDlist:
         #     for f in farIDlist:
@@ -509,10 +514,22 @@ class StateMapLearnerEmbedding(StateMapLearner):
         # Embedding
         self.imgconverter = WebotImageConvertor(self.cam_height, self.cam_width)
         self.imgembedder = MobileNetEmbedder()
-        self.hippomap.set_lowSthresh(0.5)
+        self.hippomap.set_lowSthresh(0.8)
         self.n_components = 50
         self.pca = IncrementalPCA(n_components=self.n_components)
         self.embedding_buffer = []
+
+        self.vaelearner = VAELearner(
+            input_dim=576,
+            hidden_dims=[400, 200, 100, 50, 25],
+            kld_mul=0.01,
+            lr=0.001,
+            lr_gamma=0.95,
+            weight_decay=0
+        )
+
+        self.vaelearner.load_checkpoint('data\VAE\model\kldmul=0.010000_bottle25\ckpt_kldmul=0.010000_bottle25.pt')
+        self.vaelearner.vae.eval()
 
     def get_obs_base(self):
         id_list = self.recognize_objects()
@@ -526,19 +543,22 @@ class StateMapLearnerEmbedding(StateMapLearner):
             img_bytes = self.cam.getImage()
             img_tensor = self.imgconverter.to_torch_RGB(img_bytes)
             embedding = self.imgembedder.infer_embedding(img_tensor)
-            self.embedding_buffer.append(embedding.copy())
-
-            if len(self.embedding_buffer) > self.n_components:
-                print('Partially fitting PCA')
-                self.pca.partial_fit(np.stack(self.embedding_buffer))
-                self.embedding_buffer = []
-                print(f'Total exlained variance = {self.pca.explained_variance_ratio_.sum()}')
-
-            try:
-                embedding_PC = self.pca.transform(embedding.reshape(1, -1))
-                self.hippomap.learn_embedding(self.hipposeq.X, embedding_PC.squeeze(), far_ids=far_ids)
-            except NotFittedError:
-                pass
+            with torch.no_grad():
+                _, mu, _ = self.vaelearner.vae(embedding.unsqueeze(0))
+            vae_embed = mu.squeeze().detach().numpy().copy()
+            self.hippomap.learn_embedding(self.hipposeq.X, vae_embed, far_ids=far_ids)
+            # self.embedding_buffer.append(embedding.numpy().copy())
+            # if len(self.embedding_buffer) > self.n_components:
+            #     print('Partially fitting PCA')
+            #     self.pca.partial_fit(np.stack(self.embedding_buffer))
+            #     self.embedding_buffer = []
+            #     print(f'Total exlained variance = {self.pca.explained_variance_ratio_.sum()}')
+            #
+            # try:
+            #     embedding_PC = self.pca.transform(embedding.reshape(1, -1))
+            #     self.hippomap.learn_embedding(self.hipposeq.X, embedding_PC.squeeze(), far_ids=far_ids)
+            # except NotFittedError:
+            #     pass
 
 
         # print('Interred state = %d   / %d  , val = %0.2f. F = %d, Xsum=%0.4f'%(sid+1, self.hippomap.N, Snodes[sid], self.hippomap.current_F, self.hipposeq.X.sum()))
@@ -568,6 +588,7 @@ class StateMapLearnerTaught(StateMapLearner):
         self.da = 2 * np.pi / 8  # 12
         self.hippoteach = StateTeacher(self.xbound, self.ybound, self.dp, self.da)
         self.max_Nstates = self.hippoteach.Nstates
+        self.only_close = False
 
         # Over-write parent's attributes
         self.hippomap = StateDecoder(R=R, L=L, maxN=self.max_Nstates)
@@ -583,7 +604,7 @@ class StateMapLearnerTaught(StateMapLearner):
         sidgt = self.hippoteach.lookup_xya((x, y, a))
 
 
-        id_list = self.recognize_objects()
+        id_list = self.recognize_objects(only_close=self.only_close)
         self.hipposeq.step(id_list)
         sidpred, Snodes = self.hippomap.infer_state(self.hipposeq.X)
 
@@ -597,15 +618,14 @@ class StateMapLearnerTaught(StateMapLearner):
             # print(f'GroundTruthState {sidgt} found in storage')
 
             if self.hippoteach.pred2gt_map[sidpred] == sidgt:
+                msg = 'Match    '
                 _ = self.hippomap.learn_supervised(self.hipposeq.X, sid=sidpred)
-                # msg = 'Match    '
-                # print(f'{self.hippoteach.pred2gt_map[sidpred]} match {sidgt}. Learning happened' + "="*100)
             else:
-                # msg = 'NOT Match'
+                msg = 'NOT Match'
                 _ = self.hippomap.learn_supervised(self.hipposeq.X, sid=self.hippoteach.gt2pred_map[sidgt])
 
             # print(
-            #     f'{msg} InferredState {sidpred}/{self.hippomap.N} (mappedGT={self.hippoteach.pred2gt_map[sidpred]} vs {sidgt}), val={Snodes[sidpred]}')
+                # f'{msg} InferredState {sidpred}/{self.hippomap.N} (mappedGT={self.hippoteach.pred2gt_map[sidpred]} vs {sidgt}), val={Snodes[sidpred]}')
 
         else:
             # print(f'GroundTruthState {sidgt} not found')

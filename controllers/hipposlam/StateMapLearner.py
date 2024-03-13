@@ -28,16 +28,16 @@ os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 def SB_PPO_Train():
     # Modes
-    load_model = True
+    load_model = False
     save_model = True
     hippomap_learn = True
     model_class = PPO
 
     # Paths
-    save_dir = join('data', 'StateMapLearnerEmbedding_PCA')
+    save_dir = join('data', 'StateMapLearnerTaught_L20')
     os.makedirs(save_dir, exist_ok=True)
-    load_model_name = 'PPO1'
-    save_model_name = 'PPO2'
+    load_model_name = ''
+    save_model_name = 'PPO1'
     load_hipposlam_pth = join(save_dir, '%s_hipposlam.pickle' % load_model_name)
     load_model_pth = join(save_dir, '%s.zip'%(load_model_name))
     save_hipposlam_pth = join(save_dir, '%s_hipposlam.pickle' % save_model_name)
@@ -47,8 +47,12 @@ def SB_PPO_Train():
     # save_trajdata_pth = None
 
     # Environment
-    env = StateMapLearnerEmbedding(R=5, L=20, max_hipposlam_states=1000, use_ds=False, spawn='all',
+    # env = StateMapLearnerEmbedding(R=5, L=20, max_hipposlam_states=1000, use_ds=False, spawn='all',
+    #                                  save_hipposlam_pth=save_hipposlam_pth, save_trajdata_pth=save_trajdata_pth)
+    env = StateMapLearnerTaught(R=5, L=20, use_ds=False, spawn='all',
                                      save_hipposlam_pth=save_hipposlam_pth, save_trajdata_pth=save_trajdata_pth)
+
+
     info_keywords = ('Nstates', 'last_r', 'terminated', 'truncated', 'stuck', 'fallen', 'timeout')
     env = Monitor(env, save_record_pth, info_keywords=info_keywords)
     check_env(env)
@@ -122,7 +126,7 @@ def ImageSampling():
 
     env = ImageSampler()
     max_img_num = 10000
-    env.c = 5023
+    env.c = 0
     while env.c < max_img_num:
         print(r'%d/%d'%(env.c, max_img_num), end='', flush=True)
         env.reset()
