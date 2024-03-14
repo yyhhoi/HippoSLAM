@@ -169,7 +169,7 @@ def get_dataloaders(load_annotation_pth, load_embed_dir):
 
 def TrainVAE(kld_mul=1):
 
-    model_tag = f'AnnealingNew_bottle25'
+    model_tag = f'Annealing_bottle25'
     data_dir = join('data', 'VAE')
     load_embed_dir = join(data_dir, 'embeds2')
     load_annotation_pth = join(data_dir, 'annotations2.csv')
@@ -185,19 +185,19 @@ def TrainVAE(kld_mul=1):
         hidden_dims=[400, 200, 100, 50, 25],
         kld_mul=kld_mul,
         lr=0.001,
-        lr_gamma=0.95,
+        lr_gamma=0.98,
         weight_decay=0
     )
 
     cycle_nums = 10
-    num_epoches = 20
+    num_epoches = 21
+    betas = np.linspace(0, 1, num_epoches)
 
     keys = [f'{a}_{b}' for a in ['recon', 'kld'] for b in ['train', 'test']]
     loss_recorder = Recorder(*(keys + ['lr', 'beta']))
 
     for cyci in range(cycle_nums):
         cyclemodel_tag = f'{model_tag}_cycle{cyci}'
-        kld_muls = np.linspace(0, 1, num_epoches)
         save_ckpt_pth = join(save_dir, f'ckpt_{cyclemodel_tag}.pt')
         for ei in tqdm(range(num_epoches)):
 
@@ -207,17 +207,17 @@ def TrainVAE(kld_mul=1):
             # Training
             vaelearner.vae.train()
             for x_train, _ in iter(train_dataloader):
-                loss_train, (recon_loss_train, kld_loss_train) = vaelearner.train(x_train, kld_muls[ei])
+                loss_train, (recon_loss_train, kld_loss_train) = vaelearner.train(x_train, betas[ei])
                 epoch_recorder.record(recon_train=recon_loss_train, kld_train=kld_loss_train)
 
             # Testing
             vaelearner.vae.eval()
             for x_test, _ in iter(test_dataloader):
-                loss_test, (recon_loss_test, kld_loss_test), _ = vaelearner.infer(x_test, kld_muls[ei])
+                loss_test, (recon_loss_test, kld_loss_test), _ = vaelearner.infer(x_test, betas[ei])
                 epoch_recorder.record(recon_test=recon_loss_test, kld_test=kld_loss_test)
             avers_dict = epoch_recorder.return_avers()
             loss_recorder.record(**avers_dict)
-            loss_recorder.record(lr=vaelearner.lr_opt.get_last_lr()[0], beta=kld_muls[ei])
+            loss_recorder.record(lr=vaelearner.lr_opt.get_last_lr()[0], beta=betas[ei])
             # vaelearner.lr_opt.step()
         vaelearner.save_checkpoint(save_ckpt_pth)
 

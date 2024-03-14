@@ -5,18 +5,18 @@ from os.path import join
 import numpy as np
 import torch
 import umap
-from try_VAE import get_dataloaders, VAELearner
+from hipposlam.trainVAE import get_dataloaders, VAELearner
 from sklearn.decomposition import PCA
 
 def plot_umap():
     # Paths
     model_tag = f'Annealing_bottle25'
     ckpt_name = 'ckpt_Annealing_bottle25_cycle9.pt'
-    # model_tag = 'OnlyEmbed'
+    model_tag = 'OnlyEmbed'
 
     data_dir = join('data', 'VAE')
-    load_embed_dir = join(data_dir, 'embeds')
-    load_annotation_pth = join(data_dir, 'annotations.csv')
+    load_embed_dir = join(data_dir, 'embeds2')
+    load_annotation_pth = join(data_dir, 'annotations2.csv')
     save_dir = join(data_dir, 'model', model_tag)
     load_ckpt_pth = join(save_dir, ckpt_name)
     save_plot_dir = join(save_dir, 'umap_plots')
@@ -33,7 +33,7 @@ def plot_umap():
                             lr=0.001,
                             lr_gamma=0.95,
                             weight_decay=0)
-    vaelearner.load_checkpoint(load_ckpt_pth)
+    # vaelearner.load_checkpoint(load_ckpt_pth)
 
 
     # Predict latents
@@ -43,17 +43,17 @@ def plot_umap():
     labels_train_tmp = []
     labels_test_tmp = []
     for x_train, label_train in iter(train_dataloader):
-        _, _, (y, mu_train, _) = vaelearner.infer(x_train)
-        mu_train_tmp.append(mu_train)
-        # mu_train_tmp.append(x_train)
+        _, _, (y, mu_train, _) = vaelearner.infer(x_train, kld_mul=1)
+        # mu_train_tmp.append(mu_train)
+        mu_train_tmp.append(x_train)
         labels_train_tmp.append(label_train)
     mus_train = torch.vstack(mu_train_tmp)
     labels_train = torch.vstack(labels_train_tmp)
 
     for x_test, label_test in iter(test_dataloader):
-        _, _, (y, mu_test, _) = vaelearner.infer(x_test)
-        mu_test_tmp.append(mu_test)
-        # mu_test_tmp.append(x_test)
+        _, _, (y, mu_test, _) = vaelearner.infer(x_test, kld_mul=1)
+        # mu_test_tmp.append(mu_test)
+        mu_test_tmp.append(x_test)
         labels_test_tmp.append(label_test)
     mus_test = torch.vstack(mu_test_tmp)
     labels_test = torch.vstack(labels_test_tmp)
