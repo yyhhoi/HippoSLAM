@@ -52,15 +52,19 @@ class EmbeddingImageDataset(Dataset):
         return embed, label
 
 class EmbeddingImageDatasetAll(EmbeddingImageDataset):
-    def __init__(self, load_annotation_pth, load_embed_dir):
+    def __init__(self, load_annotation_pth, load_embed_dir, to_numpy=False):
         super().__init__(load_annotation_pth, load_embed_dir)
         self.embed_all = torch.load(join(self.load_embed_dir, 'all.pt'))
-
+        self.to_numpy = to_numpy
 
     def __getitem__(self, idx):
         embed = self.embed_all[idx, :]
         label = torch.tensor(self.img_labels.iloc[idx, [1, 2, 3]], dtype=torch.float32)
-        return embed, label
+
+        if self.to_numpy:
+            return embed.numpy(), label.numpy()
+        else:
+            return embed, label
 
 
 def convert_to_embed(load_img_dir, load_annotation_pth, save_embed_dir):
