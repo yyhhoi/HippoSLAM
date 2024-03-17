@@ -1,5 +1,6 @@
 import os
 from matplotlib import pyplot as plt
+from pycircstat import cdiff
 from torch.optim.lr_scheduler import ExponentialLR
 from torchvision import models
 from tqdm import tqdm
@@ -13,6 +14,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, random_split
 from torchvision.io import read_image
+import logging
 
 
 class WebotsImageDataset(Dataset):
@@ -59,13 +61,74 @@ class EmbeddingImageDatasetAll(EmbeddingImageDataset):
 
     def __getitem__(self, idx):
         embed = self.embed_all[idx, :]
-        label = torch.tensor(self.img_labels.iloc[idx, [1, 2, 3]], dtype=torch.float32)
+        label = torch.tensor(self.img_labels.iloc[0][list('xya')], dtype=torch.float32)
 
         if self.to_numpy:
             return embed.numpy(), label.numpy()
         else:
             return embed, label
 
+    def get_all(self):
+        if self.to_numpy:
+            return self.embed_all.numpy(), self.img_labels[['x', 'y', 'a']].to_numpy()
+        else:
+            return self.embed_all, torch.tensor(self.img_labels[list('xya')], dtype=torch.float32)
+
+
+
+class ContrastiveEmbeddingDataset:
+    def __init__(self, load_annotation_pth, load_embed_dir, datainds, dist_thresh=0.1, adiff_thresh=0.1):
+        self.load_annotation_pth = load_annotation_pth
+        self.load_embed_dir = load_embed_dir
+        self.dist_thresh= dist_thresh
+        self.adiff_thresh = adiff_thresh
+        self.embed_all = torch.load(join(self.load_embed_dir, 'all.pt'))[datainds[0]:datainds[1]]
+        self.img_labels = pd.read_csv(load_annotation_pth, header=0).to_numpy()[datainds[0]:datainds[1], [1, 2, 3]]
+        self.sim_rcids, self.dissim_rcids = self._compute_contrastive_labels()
+        self.sim_size, self.dissim_size = self.sim_rcids.shape[0], self.dissim_rcids.shape[0]
+
+    def iterate(self, batchsize):
+        assert (batchsize < self.sim_size) and (batchsize < self.dissim_size)
+        sim_randvec = np.random.permutation(self.sim_size)
+        dissim_randvec = np.random.permutation(self.sim_size)
+        slice_inds = np.append(np.arange(0, self.sim_size, batchsize), self.sim_size)
+        logging.info('Total Iterations = %d'%slice_inds.shape[0])
+
+        for i in range(len(slice_inds)-1):
+            start_ind, end_ind = slice_inds[i], slice_inds[i+1]
+
+            sim_randinds = sim_randvec[start_ind:end_ind]
+            sim_rids = self.sim_rcids[sim_randinds, 0]
+            sim_cids = self.sim_rcids[sim_randinds, 1]
+            simbatch1 = self.embed_all[sim_rids]
+            simbatch2 = self.embed_all[sim_cids]
+
+            dissim_randinds = dissim_randvec[start_ind:end_ind]
+            dissim_rids = self.dissim_rcids[dissim_randinds, 0]
+            dissim_cids = self.dissim_rcids[dissim_randinds, 1]
+            dissimbatch1 = self.embed_all[dissim_rids]
+            dissimbatch2 = self.embed_all[dissim_cids]
+
+            yield (simbatch1, simbatch2), (dissimbatch1, dissimbatch2)
+
+
+    def _compute_contrastive_labels(self):
+        x = self.img_labels[:, 0]
+        y = self.img_labels[:, 1]
+        a = self.img_labels[:, 2]
+        xmin, ymin = self.img_labels[:, [0, 1]].min(axis=0)
+        xmax, ymax = self.img_labels[:, [0, 1]].max(axis=0)
+        xnorm = (x-xmin)/(xmax-xmin)
+        ynorm = (y-ymin)/(ymax-ymin)
+        adiff = cdiff(a.reshape(-1, 1), a.reshape(1, -1)) / np.pi
+        posdist = np.sqrt((xnorm.reshape(-1, 1) - xnorm.reshape(1, -1)) ** 2 + (ynorm.reshape(-1, 1) - ynorm.reshape(1, -1)) ** 2) / np.sqrt(2)
+        sim_mask_tmp = (posdist < self.dist_thresh) & (adiff < self.adiff_thresh)
+        no_diag_mask = ~np.eye(sim_mask_tmp.shape[0]).astype(bool)
+        sim_mask = sim_mask_tmp & no_diag_mask
+        dissim_mask = ~sim_mask_tmp
+        sim_rcids = np.stack(np.where(sim_mask)).T
+        dissim_rcids = np.stack(np.where(dissim_mask)).T
+        return sim_rcids, dissim_rcids
 
 def convert_to_embed(load_img_dir, load_annotation_pth, save_embed_dir):
     """
@@ -137,6 +200,24 @@ class VAELearner:
         loss = recon_loss + kld_mul * kld_loss
         return loss, (recon_loss, kld_loss), (y, mu, logvar)
 
+    def train_contrastive(self, sim1x, sim2x, dissim1x, dissim2x, kld_mul, margin, con_mul):
+        sim1y, sim_mu1, sim_logvar1 = self.vae(sim1x)
+        sim2y, sim_mu2, sim_logvar2 = self.vae(sim2x)
+        dissim1y, dissim_mu1, dissim_logvar1 = self.vae(dissim1x)
+        dissim2y, dissim_mu2, dissim_logvar2 = self.vae(dissim2x)
+
+        recon_loss = nn.functional.mse_loss(sim1y, sim1x) + nn.functional.mse_loss(sim2y, sim2x) + \
+                     nn.functional.mse_loss(dissim1y, dissim1x) + nn.functional.mse_loss(dissim2y, dissim2x)
+        kld_loss = self.kld(sim_mu1, sim_logvar1) + self.kld(sim_mu2, sim_logvar2) + \
+                   self.kld(dissim_mu1, dissim_logvar1) + self.kld(dissim_mu2, dissim_logvar2)
+
+
+
+        contrast_dist = torch.sqrt(torch.sum(torch.square(dissim_mu1 - dissim_mu2), dim=1))
+        dissim_loss = torch.mean(torch.square(nn.functional.relu(margin - contrast_dist)))
+        contrastive_loss = torch.mean(torch.sum(torch.square(sim_mu1 - sim_mu2), dim=1)) + dissim_loss
+        total_loss = recon_loss + kld_mul * kld_loss + con_mul * contrastive_loss
+        return total_loss.item(), (recon_loss.item(), kld_loss.item(), contrastive_loss.item())
 
 
     @staticmethod
@@ -264,6 +345,97 @@ def TrainVAE(kld_mul=1):
     plt.close(fig)
 
 
+def TrainContrastiveVAE(con_mul=0.1):
+
+    model_tag = f'ContrastiveVAEmul=%0.4f'
+    data_dir = join('data', 'VAE')
+    load_embed_dir = join(data_dir, 'embeds2')
+    load_annotation_pth = join(data_dir, 'annotations2.csv')
+    save_dir = join(data_dir, 'model', model_tag)
+    os.makedirs(save_dir, exist_ok=True)
+
+    # Prepare datasets
+    train_dataset = ContrastiveEmbeddingDataset(load_annotation_pth, load_embed_dir, [0, 8000])
+    test_dataset = ContrastiveEmbeddingDataset(load_annotation_pth, load_embed_dir, [8000, 10032])
+
+
+    # Model & Set-up
+    vaelearner = VAELearner(
+        input_dim=576,
+        hidden_dims=[400, 200, 100, 50, 25],
+        kld_mul=1,
+        lr=0.001,
+        lr_gamma=0.98,
+        weight_decay=0
+    )
+
+    cycle_nums = 5
+    num_epoches = 10
+    batchsize = 64
+    margin = 0.1
+    betas = np.linspace(0, 1, num_epoches)
+
+    keys = [f'{a}_{b}' for a in ['recon', 'kld', 'con'] for b in ['train', 'test']]
+    loss_recorder = Recorder(*(keys + ['lr', 'beta']))
+
+    for cyci in range(cycle_nums):
+        cyclemodel_tag = f'{model_tag}_cycle{cyci}'
+        save_ckpt_pth = join(save_dir, f'ckpt_{cyclemodel_tag}.pt')
+        for ei in range(num_epoches):
+
+            print('\rTraining epoch %d/%d'%(ei, num_epoches), flush=True, end='')
+            epoch_recorder = Recorder(*keys)
+
+            # Training
+            vaelearner.vae.train()
+            for (sim1x, sim2x), (dissim1x, dissim2x) in tqdm(train_dataset.iterate(batchsize=batchsize)):
+                loss_train, (recon_loss_train, kld_loss_train, con_loss_train) = vaelearner.train_contrastive(
+                    sim1x, sim2x, dissim1x, dissim2x, betas[ei], margin, con_mul)
+                logging.debug([loss_train, recon_loss_train, kld_loss_train, con_loss_train])
+                epoch_recorder.record(recon_train=recon_loss_train, kld_train=kld_loss_train, con_train=con_loss_train)
+
+            # Testing
+            vaelearner.vae.eval()
+            with torch.no_grad():
+                for (sim1x, sim2x), (dissim1x, dissim2x) in test_dataset.iterate(batchsize=batchsize):
+
+                    loss_test, (recon_loss_test, kld_loss_test, con_loss_test) = vaelearner.train_contrastive(
+                        sim1x, sim2x, dissim1x, dissim2x, betas[ei], margin, con_mul)
+                    epoch_recorder.record(recon_test=recon_loss_test, kld_test=kld_loss_test, con_test=con_loss_test)
+
+
+            avers_dict = epoch_recorder.return_avers()
+            print(avers_dict)
+            loss_recorder.record(**avers_dict)
+            loss_recorder.record(lr=vaelearner.lr_opt.get_last_lr()[0], beta=betas[ei])
+            # vaelearner.lr_opt.step()
+        vaelearner.save_checkpoint(save_ckpt_pth)
+
+    # Plot loss
+    fig, ax = plt.subplots(5, 1, figsize=(10, 14), sharex=True)
+    ax[0].plot(loss_recorder['recon_train'], label='recon_train')
+    ax[0].plot(loss_recorder['recon_test'], label='recon_test')
+    ax[0].set_title('train=%0.6f, test=%0.6f'% (loss_recorder['recon_train'][-1], loss_recorder['recon_test'][-1]))
+    ax[0].legend()
+    ax[1].plot(loss_recorder['kld_train'], label='kld_train')
+    ax[1].plot(loss_recorder['kld_test'], label='kld_test')
+    ax[1].set_title('train=%0.6f, test=%0.6f' % (loss_recorder['kld_train'][-1], loss_recorder['kld_test'][-1]))
+    ax[1].legend()
+    ax[2].plot(loss_recorder['con_train'], label='con_train')
+    ax[2].plot(loss_recorder['con_test'], label='con_test')
+    ax[2].set_title('train=%0.6f, test=%0.6f' % (loss_recorder['con_train'][-1], loss_recorder['con_test'][-1]))
+    ax[2].legend()
+
+
+    for axeach in ax[:3]:
+        axeach.set_ylim(0, 0.1)
+    ax[3].plot(loss_recorder['lr'], marker='x')
+    ax[3].set_xlabel('Epoch')
+    ax[3].set_ylabel('Learning rate')
+    ax[4].plot(loss_recorder['beta'], marker='x')
+    fig.savefig(join(save_dir, f'Losses_{model_tag}.png'), dpi=300)
+    plt.close(fig)
+    loss_recorder.to_csv(join(save_dir, 'Loss.csv'))
 
 
 
@@ -275,7 +447,8 @@ if __name__ == "__main__":
     # load_annotation_pth = join(data_dir, 'annotations2.csv')
     # save_embed_dir = join(data_dir, 'embeds2')
     # convert_to_embed(load_img_dir, load_annotation_pth, save_embed_dir)
-    TrainVAE()
+    # TrainVAE()
+    TrainContrastiveVAE(0.1)
     # for kld_mul in [0.1, 0.01, 0.001]:
     #     print(f'\n {kld_mul:0.6f}')
     #     TrainVAE(kld_mul)

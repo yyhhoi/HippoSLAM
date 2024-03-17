@@ -1,4 +1,5 @@
-from hipposlam.trainVAE import TrainVAE
+from hipposlam.trainVAE import TrainContrastiveVAE
+import logging
 if __name__ == "__main__":
-
-    TrainVAE()
+    logging.basicConfig(level=logging.INFO)
+    TrainContrastiveVAE(0.1)
