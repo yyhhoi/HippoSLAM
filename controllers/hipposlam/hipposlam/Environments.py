@@ -16,7 +16,7 @@ import gymnasium as gym
 from .Sequences import Sequences, StateDecoder, StateTeacher
 from .utils import save_pickle, read_pickle, TrajWriter, Recorder
 from .vision import WebotImageConvertor, MobileNetEmbedder
-from .trainVAE import VAELearner
+from .VAE import VAELearner
 
 
 class Forest(Supervisor, gym.Env):

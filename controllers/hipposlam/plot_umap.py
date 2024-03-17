@@ -1,18 +1,22 @@
 import os
 from matplotlib import pyplot as plt
+
+from hipposlam.DataLoaders import ContrastiveEmbeddingDataloader
+
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 from os.path import join
 import numpy as np
 import torch
 import umap
-from hipposlam.trainVAE import get_dataloaders, VAELearner
+from hipposlam.VAE import get_dataloaders, VAELearner, ContrastiveVAELearner
 from sklearn.decomposition import PCA
 
 def plot_umap():
     # Paths
-    model_tag = f'Annealing_bottle25'
-    ckpt_name = 'ckpt_Annealing_bottle25_cycle9.pt'
-    model_tag = 'OnlyEmbed'
+    con_mul = 1
+    model_tag = f'ContrastiveVAEmul=%0.4f' % con_mul
+    ckpt_name = 'ckpt_%s_cycle9.pt'%model_tag
+    # model_tag = 'OnlyEmbed'
 
     data_dir = join('data', 'VAE')
     load_embed_dir = join(data_dir, 'embeds2')
@@ -23,17 +27,22 @@ def plot_umap():
     os.makedirs(save_plot_dir, exist_ok=True)
 
     # Prepare datasets
-    train_dataloader, test_dataloader, train_dataset, test_dataset = get_dataloaders(load_annotation_pth, load_embed_dir)
+    batchsize = 64
+    train_dataloader = ContrastiveEmbeddingDataloader(load_annotation_pth, load_embed_dir, batchsize, [0, 8000])
+    test_dataloader = ContrastiveEmbeddingDataloader(load_annotation_pth, load_embed_dir, batchsize, [8000, 10032])
 
     # Model
     dims = [400, 200, 100, 50, 25]
-    vaelearner = VAELearner(input_dim=576,
-                            hidden_dims=dims,
-                            kld_mul=0.1,
-                            lr=0.001,
-                            lr_gamma=0.95,
-                            weight_decay=0)
-    # vaelearner.load_checkpoint(load_ckpt_pth)
+    vaelearner = ContrastiveVAELearner(
+        input_dim=576,
+        hidden_dims=[400, 200, 100, 50, 25],
+        con_margin=0.1,
+        con_mul=con_mul,
+        lr=0.001,
+        lr_gamma=0.98,
+        weight_decay=0
+    )
+    vaelearner.load_checkpoint(load_ckpt_pth)
 
 
     # Predict latents
@@ -42,18 +51,18 @@ def plot_umap():
     mu_test_tmp = []
     labels_train_tmp = []
     labels_test_tmp = []
-    for x_train, label_train in iter(train_dataloader):
-        _, _, (y, mu_train, _) = vaelearner.infer(x_train, kld_mul=1)
-        # mu_train_tmp.append(mu_train)
-        mu_train_tmp.append(x_train)
+    for (x_train, label_train), _ in train_dataloader.iterate():
+        _, _, (y, mu_train, _) = vaelearner.infer(x_train, 1)
+        mu_train_tmp.append(mu_train)
+        # mu_train_tmp.append(x_train)
         labels_train_tmp.append(label_train)
     mus_train = torch.vstack(mu_train_tmp)
     labels_train = torch.vstack(labels_train_tmp)
 
-    for x_test, label_test in iter(test_dataloader):
-        _, _, (y, mu_test, _) = vaelearner.infer(x_test, kld_mul=1)
-        # mu_test_tmp.append(mu_test)
-        mu_test_tmp.append(x_test)
+    for (x_test, label_test), _ in test_dataloader.iterate():
+        _, _, (y, mu_test, _) = vaelearner.infer(x_test, 1)
+        mu_test_tmp.append(mu_test)
+        # mu_test_tmp.append(x_test)
         labels_test_tmp.append(label_test)
     mus_test = torch.vstack(mu_test_tmp)
     labels_test = torch.vstack(labels_test_tmp)
@@ -92,7 +101,7 @@ def plot_umap():
                 im2 = ax2.scatter(umap_embeds_toplot[:, 0], umap_embeds_toplot[:, 1], s=1, c=labels_toplot[:, 2], cmap='hsv', alpha=0.5)
                 plt.colorbar(im2, ax=ax2)
 
-                txt = f'nneigh={nneigh}\nmindist={min_dist:0.2f}\nmetric={metric}\nkldmul={vaelearner.kld_mul:0.6f}\n' + \
+                txt = f'nneigh={nneigh}\nmindist={min_dist:0.2f}\nmetric={metric}\nconmul={vaelearner.con_mul:0.6f}\n' + \
                       f'dims={str(dims)}\n'
                 ax3.annotate(text=txt, xy =(0.2, 0.5), xycoords='axes fraction')
                 ax3.axis('off')

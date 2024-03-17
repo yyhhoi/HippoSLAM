@@ -14,121 +14,9 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, random_split
 from torchvision.io import read_image
+from .DataLoaders import WebotsImageDataset, EmbeddingImageDataset, EmbeddingImageDatasetAll, ContrastiveEmbeddingDataloader
 import logging
 
-
-class WebotsImageDataset(Dataset):
-    def __init__(self, load_annotation_pth, load_img_dir, transform=None, target_transform=None):
-        self.img_labels = pd.read_csv(load_annotation_pth, header=0)
-        self.load_img_dir = load_img_dir
-        self.transform = transform
-        self.target_transform = target_transform
-
-    def __len__(self):
-        return len(self.img_labels)
-
-    def __getitem__(self, idx):
-
-        img_path = os.path.join(self.load_img_dir, '%d.png'%self.img_labels.iloc[idx, 0])
-        image = read_image(img_path)[:3, ...]
-        label = torch.tensor(self.img_labels.iloc[idx, [1, 2, 3]], dtype=torch.float32)
-
-        if self.transform:
-            image = self.transform(image)
-        if self.target_transform:
-            label = self.target_transform(label)
-        return image, label
-
-class EmbeddingImageDataset(Dataset):
-    def __init__(self, load_annotation_pth, load_embed_dir):
-        self.img_labels = pd.read_csv(load_annotation_pth, header=0)
-        self.load_embed_dir = load_embed_dir
-
-    def __len__(self):
-        return len(self.img_labels)
-
-    def __getitem__(self, idx):
-        embed_path = os.path.join(self.load_embed_dir, '%d.pt'%self.img_labels.iloc[idx, 0])
-        embed = torch.load(embed_path)
-        label = torch.tensor(self.img_labels.iloc[idx, [1, 2, 3]], dtype=torch.float32)
-        return embed, label
-
-class EmbeddingImageDatasetAll(EmbeddingImageDataset):
-    def __init__(self, load_annotation_pth, load_embed_dir, to_numpy=False):
-        super().__init__(load_annotation_pth, load_embed_dir)
-        self.embed_all = torch.load(join(self.load_embed_dir, 'all.pt'))
-        self.to_numpy = to_numpy
-
-    def __getitem__(self, idx):
-        embed = self.embed_all[idx, :]
-        label = torch.tensor(self.img_labels.iloc[0][list('xya')], dtype=torch.float32)
-
-        if self.to_numpy:
-            return embed.numpy(), label.numpy()
-        else:
-            return embed, label
-
-    def get_all(self):
-        if self.to_numpy:
-            return self.embed_all.numpy(), self.img_labels[['x', 'y', 'a']].to_numpy()
-        else:
-            return self.embed_all, torch.tensor(self.img_labels[list('xya')], dtype=torch.float32)
-
-
-
-class ContrastiveEmbeddingDataset:
-    def __init__(self, load_annotation_pth, load_embed_dir, datainds, dist_thresh=0.1, adiff_thresh=0.1):
-        self.load_annotation_pth = load_annotation_pth
-        self.load_embed_dir = load_embed_dir
-        self.dist_thresh= dist_thresh
-        self.adiff_thresh = adiff_thresh
-        self.embed_all = torch.load(join(self.load_embed_dir, 'all.pt'))[datainds[0]:datainds[1]]
-        self.img_labels = pd.read_csv(load_annotation_pth, header=0).to_numpy()[datainds[0]:datainds[1], [1, 2, 3]]
-        self.sim_rcids, self.dissim_rcids = self._compute_contrastive_labels()
-        self.sim_size, self.dissim_size = self.sim_rcids.shape[0], self.dissim_rcids.shape[0]
-
-    def iterate(self, batchsize):
-        assert (batchsize < self.sim_size) and (batchsize < self.dissim_size)
-        sim_randvec = np.random.permutation(self.sim_size)
-        dissim_randvec = np.random.permutation(self.sim_size)
-        slice_inds = np.append(np.arange(0, self.sim_size, batchsize), self.sim_size)
-        logging.info('Total Iterations = %d'%slice_inds.shape[0])
-
-        for i in range(len(slice_inds)-1):
-            start_ind, end_ind = slice_inds[i], slice_inds[i+1]
-
-            sim_randinds = sim_randvec[start_ind:end_ind]
-            sim_rids = self.sim_rcids[sim_randinds, 0]
-            sim_cids = self.sim_rcids[sim_randinds, 1]
-            simbatch1 = self.embed_all[sim_rids]
-            simbatch2 = self.embed_all[sim_cids]
-
-            dissim_randinds = dissim_randvec[start_ind:end_ind]
-            dissim_rids = self.dissim_rcids[dissim_randinds, 0]
-            dissim_cids = self.dissim_rcids[dissim_randinds, 1]
-            dissimbatch1 = self.embed_all[dissim_rids]
-            dissimbatch2 = self.embed_all[dissim_cids]
-
-            yield (simbatch1, simbatch2), (dissimbatch1, dissimbatch2)
-
-
-    def _compute_contrastive_labels(self):
-        x = self.img_labels[:, 0]
-        y = self.img_labels[:, 1]
-        a = self.img_labels[:, 2]
-        xmin, ymin = self.img_labels[:, [0, 1]].min(axis=0)
-        xmax, ymax = self.img_labels[:, [0, 1]].max(axis=0)
-        xnorm = (x-xmin)/(xmax-xmin)
-        ynorm = (y-ymin)/(ymax-ymin)
-        adiff = cdiff(a.reshape(-1, 1), a.reshape(1, -1)) / np.pi
-        posdist = np.sqrt((xnorm.reshape(-1, 1) - xnorm.reshape(1, -1)) ** 2 + (ynorm.reshape(-1, 1) - ynorm.reshape(1, -1)) ** 2) / np.sqrt(2)
-        sim_mask_tmp = (posdist < self.dist_thresh) & (adiff < self.adiff_thresh)
-        no_diag_mask = ~np.eye(sim_mask_tmp.shape[0]).astype(bool)
-        sim_mask = sim_mask_tmp & no_diag_mask
-        dissim_mask = ~sim_mask_tmp
-        sim_rcids = np.stack(np.where(sim_mask)).T
-        dissim_rcids = np.stack(np.where(dissim_mask)).T
-        return sim_rcids, dissim_rcids
 
 def convert_to_embed(load_img_dir, load_annotation_pth, save_embed_dir):
     """
@@ -161,11 +49,10 @@ def convert_to_embed(load_img_dir, load_annotation_pth, save_embed_dir):
     torch.save(torch.stack(all_embeds), join(save_embed_dir, 'all.pt'))
 
 class VAELearner:
-    def __init__(self, input_dim, hidden_dims, kld_mul=0.01, lr=0.001, lr_gamma=0.9, weight_decay=0):
+    def __init__(self, input_dim, hidden_dims, lr=0.001, lr_gamma=0.9, weight_decay=0):
         self.vae = VAE(input_dim, hidden_dims)  # input_dim = 576
         self.vae_opt = torch.optim.Adam(params=self.vae.parameters(), lr=lr, weight_decay=weight_decay)
         self.lr_opt = ExponentialLR(self.vae_opt, gamma=lr_gamma)
-        self.kld_mul = kld_mul
 
     def train(self, x, kld_mul):
         """
@@ -200,25 +87,6 @@ class VAELearner:
         loss = recon_loss + kld_mul * kld_loss
         return loss, (recon_loss, kld_loss), (y, mu, logvar)
 
-    def train_contrastive(self, sim1x, sim2x, dissim1x, dissim2x, kld_mul, margin, con_mul):
-        sim1y, sim_mu1, sim_logvar1 = self.vae(sim1x)
-        sim2y, sim_mu2, sim_logvar2 = self.vae(sim2x)
-        dissim1y, dissim_mu1, dissim_logvar1 = self.vae(dissim1x)
-        dissim2y, dissim_mu2, dissim_logvar2 = self.vae(dissim2x)
-
-        recon_loss = nn.functional.mse_loss(sim1y, sim1x) + nn.functional.mse_loss(sim2y, sim2x) + \
-                     nn.functional.mse_loss(dissim1y, dissim1x) + nn.functional.mse_loss(dissim2y, dissim2x)
-        kld_loss = self.kld(sim_mu1, sim_logvar1) + self.kld(sim_mu2, sim_logvar2) + \
-                   self.kld(dissim_mu1, dissim_logvar1) + self.kld(dissim_mu2, dissim_logvar2)
-
-
-
-        contrast_dist = torch.sqrt(torch.sum(torch.square(dissim_mu1 - dissim_mu2), dim=1))
-        dissim_loss = torch.mean(torch.square(nn.functional.relu(margin - contrast_dist)))
-        contrastive_loss = torch.mean(torch.sum(torch.square(sim_mu1 - sim_mu2), dim=1)) + dissim_loss
-        total_loss = recon_loss + kld_mul * kld_loss + con_mul * contrastive_loss
-        return total_loss.item(), (recon_loss.item(), kld_loss.item(), contrastive_loss.item())
-
 
     @staticmethod
     def kld(mu, logvar):
@@ -229,7 +97,6 @@ class VAELearner:
         ckpt_dict = {
             'vae_state_dict': self.vae.state_dict(),
             'vae_opt_state_dict': self.vae_opt.state_dict(),
-            'kld_mul': self.kld_mul,
             'lr_opt': self.lr_opt.state_dict(),
         }
         torch.save(ckpt_dict, pth)
@@ -239,9 +106,54 @@ class VAELearner:
         self.vae.load_state_dict(checkpoint['vae_state_dict'])
         self.vae_opt.load_state_dict(checkpoint['vae_opt_state_dict'])
         self.lr_opt.load_state_dict(checkpoint['lr_opt'])
-        self.kld_mul = checkpoint['kld_mul']
 
 
+class ContrastiveVAELearner(VAELearner):
+    def __init__(self, input_dim, hidden_dims, con_margin=0.1, con_mul=0.1, lr=0.001, lr_gamma=0.9, weight_decay=0):
+        super().__init__(input_dim, hidden_dims, lr, lr_gamma, weight_decay)
+        self.con_mul = con_mul
+        self.con_margin = con_margin
+
+    def contrastive_forward(self, x, kld_mul, sim_mask, dissim_mask):
+        y, mu, logvar = self.vae(x)
+        recon_loss = nn.functional.mse_loss(y, x)
+        kld_loss = self.kld(mu, logvar)
+        cdist = torch.cdist(mu, mu)  # (N, bottleneck_dim) -> (N, N)
+        con_loss = torch.mean(sim_mask * cdist + dissim_mask * nn.functional.relu(self.con_margin - cdist))
+        loss = recon_loss + kld_mul * kld_loss + self.con_mul * con_loss
+        return loss, (recon_loss, kld_loss, con_loss)
+
+    def train_contrastive(self, x, kld_mul, sim_mask, dissim_mask):
+        loss, (recon_loss, kld_loss, con_loss) = self.contrastive_forward(x, kld_mul, sim_mask, dissim_mask)
+
+        self.vae_opt.zero_grad()
+        loss.backward()
+        self.vae_opt.step()
+        return loss.item(), (recon_loss.item(), kld_loss.item(), con_loss.item())
+
+    def test_contrastive(self, x, kld_mul, sim_mask, dissim_mask):
+        with torch.no_grad():
+            loss, (recon_loss, kld_loss, con_loss) = self.contrastive_forward(x, kld_mul, sim_mask, dissim_mask)
+        return loss.item(), (recon_loss.item(), kld_loss.item(), con_loss.item())
+
+
+    def save_checkpoint(self, pth):
+        ckpt_dict = {
+            'vae_state_dict': self.vae.state_dict(),
+            'vae_opt_state_dict': self.vae_opt.state_dict(),
+            'lr_opt': self.lr_opt.state_dict(),
+            'con_mul': self.con_mul,
+            'con_margin': self.con_margin,
+        }
+        torch.save(ckpt_dict, pth)
+
+    def load_checkpoint(self, pth):
+        checkpoint = torch.load(pth)
+        self.vae.load_state_dict(checkpoint['vae_state_dict'])
+        self.vae_opt.load_state_dict(checkpoint['vae_opt_state_dict'])
+        self.lr_opt.load_state_dict(checkpoint['lr_opt'])
+        self.con_mul = checkpoint['con_mul']
+        self.con_margin = checkpoint['con_margin']
 
 def get_dataloaders(load_annotation_pth, load_embed_dir):
 
@@ -347,32 +259,32 @@ def TrainVAE(kld_mul=1):
 
 def TrainContrastiveVAE(con_mul=0.1):
 
-    model_tag = f'ContrastiveVAEmul=%0.4f'
     data_dir = join('data', 'VAE')
     load_embed_dir = join(data_dir, 'embeds2')
     load_annotation_pth = join(data_dir, 'annotations2.csv')
+    model_tag = f'ContrastiveVAEmul=%0.4f' %con_mul
     save_dir = join(data_dir, 'model', model_tag)
     os.makedirs(save_dir, exist_ok=True)
 
     # Prepare datasets
-    train_dataset = ContrastiveEmbeddingDataset(load_annotation_pth, load_embed_dir, [0, 8000])
-    test_dataset = ContrastiveEmbeddingDataset(load_annotation_pth, load_embed_dir, [8000, 10032])
+    batchsize = 64
+    train_dataloader = ContrastiveEmbeddingDataloader(load_annotation_pth, load_embed_dir, batchsize, [0, 8000])
+    test_dataloader = ContrastiveEmbeddingDataloader(load_annotation_pth, load_embed_dir, batchsize, [8000, 10032])
 
 
     # Model & Set-up
-    vaelearner = VAELearner(
+    vaelearner = ContrastiveVAELearner(
         input_dim=576,
         hidden_dims=[400, 200, 100, 50, 25],
-        kld_mul=1,
+        con_margin=0.1,
+        con_mul=con_mul,
         lr=0.001,
         lr_gamma=0.98,
         weight_decay=0
     )
 
-    cycle_nums = 5
-    num_epoches = 10
-    batchsize = 64
-    margin = 0.1
+    cycle_nums = 10
+    num_epoches = 20
     betas = np.linspace(0, 1, num_epoches)
 
     keys = [f'{a}_{b}' for a in ['recon', 'kld', 'con'] for b in ['train', 'test']]
@@ -383,29 +295,31 @@ def TrainContrastiveVAE(con_mul=0.1):
         save_ckpt_pth = join(save_dir, f'ckpt_{cyclemodel_tag}.pt')
         for ei in range(num_epoches):
 
-            print('\rTraining epoch %d/%d'%(ei, num_epoches), flush=True, end='')
+            logging.info('Training epoch %d/%d'%(ei, num_epoches))
             epoch_recorder = Recorder(*keys)
 
             # Training
             vaelearner.vae.train()
-            for (sim1x, sim2x), (dissim1x, dissim2x) in tqdm(train_dataset.iterate(batchsize=batchsize)):
+            for (x, _), (sim_mask, dissim_mask) in tqdm(train_dataloader.iterate()):
                 loss_train, (recon_loss_train, kld_loss_train, con_loss_train) = vaelearner.train_contrastive(
-                    sim1x, sim2x, dissim1x, dissim2x, betas[ei], margin, con_mul)
-                logging.debug([loss_train, recon_loss_train, kld_loss_train, con_loss_train])
+                    x, betas[ei], sim_mask, dissim_mask)
+                logging.debug(np.around([loss_train, recon_loss_train, kld_loss_train, con_loss_train], 3))
                 epoch_recorder.record(recon_train=recon_loss_train, kld_train=kld_loss_train, con_train=con_loss_train)
 
             # Testing
             vaelearner.vae.eval()
             with torch.no_grad():
-                for (sim1x, sim2x), (dissim1x, dissim2x) in test_dataset.iterate(batchsize=batchsize):
-
-                    loss_test, (recon_loss_test, kld_loss_test, con_loss_test) = vaelearner.train_contrastive(
-                        sim1x, sim2x, dissim1x, dissim2x, betas[ei], margin, con_mul)
-                    epoch_recorder.record(recon_test=recon_loss_test, kld_test=kld_loss_test, con_test=con_loss_test)
+                for (x, _), (sim_mask, dissim_mask) in tqdm(test_dataloader.iterate()):
+                    loss_test, (recon_loss_test, kld_loss_test, con_loss_test) = vaelearner.test_contrastive(
+                        x, betas[ei], sim_mask, dissim_mask)
+                    logging.debug(np.around([loss_test, recon_loss_test, kld_loss_test, con_loss_test], 3))
+                    epoch_recorder.record(recon_test=recon_loss_test, kld_test=kld_loss_test,
+                                          con_test=con_loss_test)
 
 
             avers_dict = epoch_recorder.return_avers()
-            print(avers_dict)
+            for key, item in avers_dict.items():
+                print(f'{key}: {item: 0.4f}')
             loss_recorder.record(**avers_dict)
             loss_recorder.record(lr=vaelearner.lr_opt.get_last_lr()[0], beta=betas[ei])
             # vaelearner.lr_opt.step()
