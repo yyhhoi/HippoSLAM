@@ -14,11 +14,11 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, random_split
 from torchvision.io import read_image
-from .DataLoaders import WebotsImageDataset, EmbeddingImageDataset, EmbeddingImageDatasetAll, ContrastiveEmbeddingDataloader
+from .DataLoaders import WebotsImageDataset, EmbeddingImageDataset, EmbeddingImageDatasetAll, LocalContrastiveEmbeddingDataloader
 import logging
+from glob import glob
 
-
-def convert_to_embed(load_img_dir, load_annotation_pth, save_embed_dir):
+def convert_to_embed(load_img_dir, load_annotation_pth, save_embed_dir, all=True):
     """
     Run MobileNet V3 Small to convert images to embeddings, and save.
 
@@ -35,7 +35,11 @@ def convert_to_embed(load_img_dir, load_annotation_pth, save_embed_dir):
     preprocess = weights.transforms()
     all_embeds = []
     for i in range(len(dataset)):
-        print('\r%d/%d'%(i, len(dataset)), flush=True, end='')
+        save_embed_pth = join(save_embed_dir, f'{i}.pt')
+
+        if os.path.exists(save_embed_pth):
+            continue
+        print('\r%d/%d' % (i, len(dataset)), flush=True, end='')
         image, _ = dataset[i]
         batch_t = preprocess(image).unsqueeze(0)
         # Get the features from the model
@@ -44,9 +48,21 @@ def convert_to_embed(load_img_dir, load_annotation_pth, save_embed_dir):
             x = model.features(batch_t)
             x = model.avgpool(x)
             embedding = torch.flatten(x)
-            all_embeds.append(embedding)
-            # torch.save(embedding, join(save_embed_dir, f'{i}.pt'))
-    torch.save(torch.stack(all_embeds), join(save_embed_dir, 'all.pt'))
+            if all:
+                all_embeds.append(embedding)
+            else:
+                torch.save(embedding, save_embed_pth)
+    if all:
+        torch.save(torch.stack(all_embeds), join(save_embed_dir, 'all.pt'))
+
+def combine_embeds(load_embeds_dir):
+    pths = glob(join(load_embeds_dir, '*'))
+    all_embeds = []
+    for pth in pths:
+        embed = torch.load(pth)
+        all_embeds.append(embed)
+    torch.save(torch.stack(all_embeds), join(load_embeds_dir, 'all.pt'))
+
 
 class VAELearner:
     def __init__(self, input_dim, hidden_dims, lr=0.001, lr_gamma=0.9, weight_decay=0):
@@ -109,17 +125,19 @@ class VAELearner:
 
 
 class ContrastiveVAELearner(VAELearner):
-    def __init__(self, input_dim, hidden_dims, con_margin=0.1, con_mul=0.1, lr=0.001, lr_gamma=0.9, weight_decay=0):
+    def __init__(self, input_dim, hidden_dims, con_margin=0.1, con_mul=0.1, dismul=1.0, lr=0.001, lr_gamma=0.9, weight_decay=0):
         super().__init__(input_dim, hidden_dims, lr, lr_gamma, weight_decay)
         self.con_mul = con_mul
         self.con_margin = con_margin
+        self.dismul = dismul
 
     def contrastive_forward(self, x, kld_mul, sim_mask, dissim_mask):
         y, mu, logvar = self.vae(x)
         recon_loss = nn.functional.mse_loss(y, x)
         kld_loss = self.kld(mu, logvar)
         cdist = torch.cdist(mu, mu)  # (N, bottleneck_dim) -> (N, N)
-        con_loss = torch.mean(sim_mask * cdist + dissim_mask * nn.functional.relu(self.con_margin - cdist))
+        con_loss = torch.mean(sim_mask * cdist + self.dismul * dissim_mask * nn.functional.relu(self.con_margin - cdist))
+
         loss = recon_loss + kld_mul * kld_loss + self.con_mul * con_loss
         return loss, (recon_loss, kld_loss, con_loss)
 
@@ -260,16 +278,15 @@ def TrainVAE(kld_mul=1):
 def TrainContrastiveVAE(con_mul=0.1):
 
     data_dir = join('data', 'VAE')
-    load_embed_dir = join(data_dir, 'embeds2')
-    load_annotation_pth = join(data_dir, 'annotations2.csv')
-    model_tag = f'ContrastiveVAEmul=%0.4f' %con_mul
+    load_embed_dir = join(data_dir, 'embeds')
+    load_annotation_pth = join(data_dir, 'annotations.csv')
+    model_tag = f'LocalContrastiveVAEmul=%0.4f' %con_mul
     save_dir = join(data_dir, 'model', model_tag)
     os.makedirs(save_dir, exist_ok=True)
 
     # Prepare datasets
-    batchsize = 64
-    train_dataloader = ContrastiveEmbeddingDataloader(load_annotation_pth, load_embed_dir, batchsize, [0, 8000])
-    test_dataloader = ContrastiveEmbeddingDataloader(load_annotation_pth, load_embed_dir, batchsize, [8000, 10032])
+    train_dataloader = LocalContrastiveEmbeddingDataloader(load_annotation_pth, load_embed_dir,2, [0, 8000])
+    test_dataloader = LocalContrastiveEmbeddingDataloader(load_annotation_pth, load_embed_dir,2, [8000, 10032])
 
 
     # Model & Set-up
@@ -278,12 +295,13 @@ def TrainContrastiveVAE(con_mul=0.1):
         hidden_dims=[400, 200, 100, 50, 25],
         con_margin=0.1,
         con_mul=con_mul,
+        dismul = 0.5,
         lr=0.001,
         lr_gamma=0.98,
         weight_decay=0
     )
 
-    cycle_nums = 10
+    cycle_nums = 5
     num_epoches = 20
     betas = np.linspace(0, 1, num_epoches)
 
@@ -300,7 +318,9 @@ def TrainContrastiveVAE(con_mul=0.1):
 
             # Training
             vaelearner.vae.train()
-            for (x, _), (sim_mask, dissim_mask) in tqdm(train_dataloader.iterate()):
+            for x, _, sim_mask, dissim_mask in tqdm(train_dataloader.iterate()):
+                if x.shape[0] < 2:
+                    continue
                 loss_train, (recon_loss_train, kld_loss_train, con_loss_train) = vaelearner.train_contrastive(
                     x, betas[ei], sim_mask, dissim_mask)
                 logging.debug(np.around([loss_train, recon_loss_train, kld_loss_train, con_loss_train], 3))
@@ -309,7 +329,9 @@ def TrainContrastiveVAE(con_mul=0.1):
             # Testing
             vaelearner.vae.eval()
             with torch.no_grad():
-                for (x, _), (sim_mask, dissim_mask) in tqdm(test_dataloader.iterate()):
+                for x, _, sim_mask, dissim_mask in tqdm(test_dataloader.iterate()):
+                    if x.shape[0] < 2:
+                        continue
                     loss_test, (recon_loss_test, kld_loss_test, con_loss_test) = vaelearner.test_contrastive(
                         x, betas[ei], sim_mask, dissim_mask)
                     logging.debug(np.around([loss_test, recon_loss_test, kld_loss_test, con_loss_test], 3))
