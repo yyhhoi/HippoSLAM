@@ -1,7 +1,7 @@
 import math
 import os
 from matplotlib import pyplot as plt
-from pycircstat import cdiff
+from .circ import cdiff
 from torch.optim.lr_scheduler import ExponentialLR
 from torchvision import models
 from tqdm import tqdm

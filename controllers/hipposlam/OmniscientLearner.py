@@ -32,7 +32,7 @@ def SB_PPO_Train():
     save_record_pth = join(save_dir, '%s_TrainRecords.csv' % save_model_name)
 
     # Environment
-    env = OmniscientLearnerForest(spawn='start', goal='hard', max_episode_steps=500, use_ds=False, use_bumper=True)
+    env = OmniscientLearner(spawn='start', goal='hard', max_episode_steps=500, use_ds=False)
     info_keywords = ('last_r', 'terminated', 'truncated', 'stuck', 'fallen', 'timeout')
     env = Monitor(env, save_record_pth, info_keywords=info_keywords)
     check_env(env)
@@ -238,7 +238,7 @@ def fine_tune_trained_model():
     # Paths
     save_dir = join('data', 'OmniscientLearner')
     os.makedirs(save_dir, exist_ok=True)
-    load_model_name = 'OfflineTrained'
+    load_model_name = 'OfflineTrained_clip-1.0'
     save_model_name = 'Finetuned1'
     offline_data_pth = join(save_dir, 'NaiveController_ReplayBuffer.pickle')
     load_ckpt_pth = join(save_dir, '%s_CKPT.pt' % load_model_name)
@@ -256,16 +256,17 @@ def fine_tune_trained_model():
     max_buffer_size = 5000
 
     # Initialize models
-    critic = MLP(obs_dim, act_dim, [128, 128])
-    critic_target = MLP(obs_dim, act_dim, [128, 128])
-    actor = MLP(obs_dim, act_dim, [128, 64])
+    critic = MLP(obs_dim, act_dim, [128, 128], hidden_act='Tanh')
+    critic_target = MLP(obs_dim, act_dim, [128, 128], hidden_act='Tanh')
+    actor = MLP(obs_dim, act_dim, [128, 64], hidden_act='Tanh')
     agent = AWAC(critic, critic_target, actor,
                  lam=lam,
                  gamma=gamma,
-                 num_action_samples=100,
-                 critic_lr=5e-4,
-                 actor_lr=5e-4,
+                 num_action_samples=100,  # 10
+                 critic_lr=1e-4,  # 5e-4
+                 actor_lr=1e-4,  # 5e-4
                  weight_decay=0,
+                 clip_max_norm=1.0,
                  use_adv=True)
     agent.load_checkpoint(load_ckpt_pth)
 
@@ -359,28 +360,30 @@ def evaluate_trained_model():
 
     # Paths
     save_dir = join('data', 'OmniscientLearner')
-    model_name = 'Finetuned1'
-    load_ckpt_pth = join(save_dir, '%s_CHPT.pt'%(model_name))
+    model_name = 'OfflineTrained_clip-1.0'
+    load_ckpt_pth = join(save_dir, '%s_CKPT.pt'%(model_name))
     save_record_pth = join(save_dir, '%s.csv'%(model_name))
 
     # Parameters
-    obs_dim = 8
-    act_dim = 3
+    obs_dim = 7
+    act_dim = 4
     gamma = 0.99
     lam = 1
 
     # Initialize models
-    critic = MLP(obs_dim, act_dim, [128, 128])
-    critic_target = MLP(obs_dim, act_dim, [128, 128])
-    actor = MLP(obs_dim, act_dim, [128, 64])
+    critic = MLP(obs_dim, act_dim, [128, 128], hidden_act='Tanh')
+    critic_target = MLP(obs_dim, act_dim, [128, 128], hidden_act='Tanh')
+    actor = MLP(obs_dim, act_dim, [128, 64], hidden_act='Tanh')
     agent = AWAC(critic, critic_target, actor,
                  lam=lam,
                  gamma=gamma,
-                 num_action_samples=10,
-                 critic_lr=5e-4,
-                 actor_lr=5e-4,
+                 num_action_samples=100,  # 10
+                 critic_lr=1e-4,  # 5e-4
+                 actor_lr=1e-4,  # 5e-4
                  weight_decay=0,
+                 clip_max_norm=1.0,
                  use_adv=True)
+
     agent.load_checkpoint(load_ckpt_pth)
     agent.eval()
 
@@ -394,7 +397,7 @@ def evaluate_trained_model():
     maxtimeout = 300
     for i in range(Niters):
         print('Episode %d/%d'%(i, Niters))
-        s = env.reset()
+        s, _ = env.reset()
         t = 0
         while True:
 
@@ -403,7 +406,7 @@ def evaluate_trained_model():
             a = int(agent.get_action(s).squeeze())  # tensor (1, 1) -> int
 
             # Step
-            snext, r, done, info = env.step(a)
+            snext, r, done, truncated, info = env.step(a)
 
             # Record
             PRtraj.record(i=i, t=t, r=r)
@@ -413,7 +416,7 @@ def evaluate_trained_model():
             t += 1
 
             # Termination
-            if done or (t >= maxtimeout):
+            if done or (t >= maxtimeout) or truncated:
                 msg = "Done" if done else "Timeout"
                 print(msg)
                 break
@@ -423,9 +426,9 @@ def evaluate_trained_model():
 
 
 def main():
-    naive_avoidance()
+    # naive_avoidance()
     # evaluate_trained_model()
-    # fine_tune_trained_model()
+    fine_tune_trained_model()
     # StartOnlineA2C()
     # SB_PPO_Train()
 if __name__ == '__main__':

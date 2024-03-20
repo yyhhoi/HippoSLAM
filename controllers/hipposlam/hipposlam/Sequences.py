@@ -1,5 +1,5 @@
 import numpy as np
-from pycircstat import cdiff
+from .circ import cdiff
 from scipy.signal import convolve
 from collections import OrderedDict
 from .comput_utils import midedges

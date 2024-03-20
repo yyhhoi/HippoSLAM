@@ -5,17 +5,15 @@ from pprint import PrettyPrinter
 
 import numpy as np
 import torch
-from pycircstat import cdiff
 from skimage.io import imsave
 from sklearn.decomposition import IncrementalPCA
-from sklearn.exceptions import NotFittedError
 from stable_baselines3.common.callbacks import CheckpointCallback
 
 from controller import Supervisor
 import gymnasium as gym
 
 from .Sequences import Sequences, StateDecoder, StateTeacher
-from .utils import save_pickle, read_pickle, TrajWriter, Recorder
+from .utils import save_pickle, read_pickle, Recorder
 from .vision import WebotImageConvertor, MobileNetEmbedder
 from .VAE import VAELearner
 
