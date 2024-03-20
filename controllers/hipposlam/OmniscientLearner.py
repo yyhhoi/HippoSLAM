@@ -11,7 +11,7 @@ from hipposlam.Replay import ReplayMemoryAWAC, ReplayMemoryA2C
 from hipposlam.utils import save_pickle, read_pickle, breakroom_avoidance_policy, Recorder
 from hipposlam.Networks import MLP
 from hipposlam.ReinforcementLearning import AWAC, A2C, compute_discounted_returns
-from hipposlam.Environments import OmniscientLearner, OmniscientLearnerForest
+from hipposlam.Environments import OmniscientLearner
 from stable_baselines3 import PPO
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.env_checker import check_env
@@ -167,7 +167,9 @@ def StartOnlineA2C():
 
 def naive_avoidance():
     # Paths
-    model_name = 'NaiveControllerNoNegR'
+    save_dir = join('data', 'OmniscientLearner')
+    os.makedirs(save_dir, exist_ok=True)
+    model_name = 'NaiveController'
     save_replay_pth = join('data', 'OmniscientLearner', '%s_ReplayBuffer.pickle'%model_name)
     save_record_pth = join('data', 'OmniscientLearner', '%s_Performance.csv'%model_name)
 
@@ -175,7 +177,7 @@ def naive_avoidance():
     env = OmniscientLearner(spawn='start', goal='hard')
 
     # Record data and epsidoes
-    PRtraj = Recorder('i', 't', 'r')
+    PRtraj = Recorder('i', 't', 'r', 'done')
 
     data = {'episodes':[], 'end_r':[], 't':[]}
     cum_win = 0
@@ -183,7 +185,7 @@ def naive_avoidance():
     maxtimeout = 300
     while cum_win <= 100:
         print('Iter %d, cum_win = %d'%(len(data['end_r']), cum_win))
-        s = env.reset()
+        s, _ = env.reset()
         exp_list = []
         t = 0
         while True:
@@ -193,12 +195,15 @@ def naive_avoidance():
             a = breakroom_avoidance_policy(s[0], s[1], dsval, 0.3)
 
             # Step
-            snext, r, done, info = env.step(a)
+            snext, r, done, truncated, info = env.step(a)
 
             # Store data
-            experience = np.concatenate([
-                s, np.array([a]), snext, np.array([r]), np.array([done])
-            ])
+            try:
+                experience = np.concatenate([
+                    s, np.array([a]), snext, np.array([r]), np.array([done])
+                ])
+            except:
+                breakpoint()
             exp_list.append(experience)
 
 
@@ -207,12 +212,12 @@ def naive_avoidance():
             t += 1
 
             # Termination condition
-            if done or (t >= maxtimeout):
-                msg = "Done" if done else "Timeout"
+            if done or (t >= maxtimeout) or truncated:
+                msg = "Done" if done else "Timeout/Stuck"
                 print(msg)
                 break
 
-        PRtraj.record(i=i, t=t, r=r)
+        PRtraj.record(i=i, t=t, r=r, done=int(done))
         # Store data
         data['episodes'].append(np.vstack(exp_list))
         data['end_r'].append(r)
@@ -229,22 +234,22 @@ def fine_tune_trained_model():
     # Modes
     load_expert_buffer = False
     save_replay_buffer = False
-    online = False
 
     # Paths
     save_dir = join('data', 'OmniscientLearner')
-    load_model_name = 'FinetunedNoNegR1'
-    save_model_name = 'FinetunedNoNegR2'
+    os.makedirs(save_dir, exist_ok=True)
+    load_model_name = 'OfflineTrained'
+    save_model_name = 'Finetuned1'
     offline_data_pth = join(save_dir, 'NaiveController_ReplayBuffer.pickle')
-    load_ckpt_pth = join(save_dir, '%s_CHPT.pt' % load_model_name)
-    save_ckpt_pth = join(save_dir, '%s_CHPT.pt' % save_model_name)
+    load_ckpt_pth = join(save_dir, '%s_CKPT.pt' % load_model_name)
+    save_ckpt_pth = join(save_dir, '%s_CKPT.pt' % save_model_name)
     save_buffer_pth = join(save_dir, '%s_ReplayBuffer.pt' % save_model_name)
     save_record_pth = join(save_dir, '%s_Records.csv'%save_model_name)
     save_plot_pth = join(save_dir, '%s_LOSS.png'% save_model_name)
 
     # Parameters
-    obs_dim = 8
-    act_dim = 3
+    obs_dim = 7
+    act_dim = 4
     gamma = 0.99
     lam = 1
     batch_size = 1024
@@ -275,20 +280,20 @@ def fine_tune_trained_model():
     # Load expert data and add to replay buffer
     if load_expert_buffer:
         data = read_pickle(offline_data_pth)
-        memory.from_offline_np(data['episodes'])  # (time, data_dim=15)
+        memory.from_offline_np(data['episodes'])  # (time, data_dim)
         print('Load Expert buffer. Replay buffer has %d samples' % (len(memory)))
 
 
     # Environment
     env = OmniscientLearner(spawn='start', goal='hard')
-    PR = Recorder('i', 't', 'r', 'closs', 'aloss')
+    PR = Recorder('i', 't', 'r', 'done', 'closs', 'aloss')
 
 
     Niters = 500
     maxtimeout = 300
     for i in range(Niters):
         print('Episode %d/%d'%(i, Niters))
-        s = env.reset()
+        s, _ = env.reset()
         t = 0
         agent.eval()
         explist = []
@@ -300,7 +305,7 @@ def fine_tune_trained_model():
 
 
             # Step
-            snext, r, done, info = env.step(a)
+            snext, r, done, truncated, info = env.step(a)
 
             # Store data
             experience = torch.concat([
@@ -313,26 +318,21 @@ def fine_tune_trained_model():
             t += 1
 
             # Termination
-            if done or (t >= maxtimeout):
-                msg = "Done" if done else "Timeout"
+            if done or (t >= maxtimeout) or truncated:
+                msg = "Done" if done else "Timeout/Truncated"
                 print(msg)
                 break
 
         # Store memory
-        if not online:
-            for exp in explist:
-                memory.push(exp)
-        PR.record(i=i, t=t, r=r)
+        for exp in explist:
+            memory.push(exp)
+        PR.record(i=i, t=t, r=r, done=int(done))
 
 
         # Training
         agent.train()
-        if (len(memory) > 1) or online:
-            if online:
-                exptmp = torch.vstack(explist)
-                _s, _a, _snext, _r, _end = memory.online_process(exptmp)
-            else:
-                _s, _a, _snext, _r, _end = memory.sample(batch_size)
+        if (len(memory) > 1):
+            _s, _a, _snext, _r, _end = memory.sample(batch_size)
             critic_loss = agent.update_critic(_s, _a, _snext, _r, _end)
             actor_loss = agent.update_actor(_s, _a)
             closs = critic_loss.item()
@@ -423,10 +423,10 @@ def evaluate_trained_model():
 
 
 def main():
-    # naive_avoidance()
+    naive_avoidance()
     # evaluate_trained_model()
     # fine_tune_trained_model()
     # StartOnlineA2C()
-    SB_PPO_Train()
+    # SB_PPO_Train()
 if __name__ == '__main__':
     main()

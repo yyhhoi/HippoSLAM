@@ -12,18 +12,18 @@ from hipposlam.utils import read_pickle
 
 # Paths
 save_dir = join('data', 'OmniscientLearner')
-offline_data_pth = join(save_dir, 'NaiveControllerNoNegR_ReplayBuffer.pickle')
-save_chpt_pth = join(save_dir, 'OfflineTrainedNoNegR_CHPT.pt')
-loss_records_pth = join(save_dir, 'OfflineTrainedNoNegR_LOSS.png')
+offline_data_pth = join(save_dir, 'NaiveController_ReplayBuffer.pickle')
+save_ckpt_pth = join(save_dir, 'OfflineTrained_CKPT.pt')
+loss_records_pth = join(save_dir, 'OfflineTrained_LOSS.png')
 
 # Paramters
-obs_dim = 8
-act_dim = 3
+obs_dim = 7
+act_dim = 4
 gamma = 0.99
 lam = 1
 use_adv = True
 batch_size = 1024
-max_buffer_size = 50000
+max_buffer_size = 150000
 Niters = 50000
 
 # Initialize Networks
@@ -44,8 +44,8 @@ agent = AWAC(critic, critic_target, actor,
              lam=lam,
              gamma=gamma,
              num_action_samples=100,  # 10
-             critic_lr=5e-4,  # 5e-4
-             actor_lr=5e-4,  # 5e-4
+             critic_lr=1e-4,  # 5e-4
+             actor_lr=1e-4,  # 5e-4
              weight_decay=0,
              use_adv=True)
 
@@ -59,6 +59,10 @@ agent.train()
 closs_list, aloss_list = [], []
 for i in range(Niters):
     _s, _a, _snext, _r, _end = memory.sample(batch_size)
+    _s[:, 0] = _s[:, 0]/6
+    _s[:, 1] = _s[:, 1]/4
+    _snext[:, 0] = _snext[:, 0]/6
+    _snext[:, 1] = _snext[:, 1]/4
     critic_loss = agent.update_critic(_s, _a, _snext, _r, _end)
     actor_loss = agent.update_actor(_s, _a)
     closs = critic_loss.item()
@@ -69,7 +73,7 @@ for i in range(Niters):
         print('Training %d/%d. C/A Loss = %0.6f, %0.6f' % (i, Niters, closs, aloss))
 
 # Save checkpoints
-agent.save_checkpoint(save_chpt_pth)
+agent.save_checkpoint(save_ckpt_pth)
 
 # Plot loss records
 fig, ax = plt.subplots(2, 1, figsize=(8, 6), sharex=True)

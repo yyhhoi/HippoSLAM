@@ -116,7 +116,7 @@ def breakroom_avoidance_policy(x, y, dsval, noise=0.3):
         a = 0
 
     if np.random.rand() < noise:
-        a = int(np.random.randint(0, 3))
+        a = int(np.random.randint(0, 4))
 
     return a
 

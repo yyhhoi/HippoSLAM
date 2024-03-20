@@ -39,24 +39,26 @@ class BreakRoom(Supervisor, gym.Env):
         # Supervisor
         self.supervis = self.getSelf()
         self.translation_field = self.supervis.getField('translation')
-        self.translation_field.enableSFTracking(self.__timestep*12)
+        self.translation_field.enableSFTracking(self.__timestep)
         self.rotation_field = self.supervis.getField('rotation')
-        self.rotation_field.enableSFTracking(self.__timestep * 12)
-        self.supervis.enableContactPointsTracking(self.__timestep)
+        self.rotation_field.enableSFTracking(self.__timestep)
+
         # Self position
         self.x, self.y = None, None
         self.rotz, self.rota = None, None
         self.stuck_m = 0
-        self.stuck_epsilon = 0.0001
-        self.stuck_thresh = 10
+        self.stuck_epsilon = 0.001
+        self.stuck_thresh = 8.5
         self.fallen = False
         self.fallen_seq = 0
-        self.fallen_thresh = 0.4
+        self.fallen_thresh = 0.6
+
         # Distance sensor or bumper
         if self.use_ds:
             self.ds = []
             self.ds = self.getDevice('ds2')  # Front sensor
-            self.ds.enable(self.__timestep * 4)
+            self.ds.enable(self.__timestep)
+
         # Wheels
         self.leftMotor1 = self.getDevice('wheel1')
         self.leftMotor2 = self.getDevice('wheel3')
@@ -64,7 +66,7 @@ class BreakRoom(Supervisor, gym.Env):
         self.rightMotor2 = self.getDevice('wheel4')
         self.MAX_SPEED = 15
         # Action - 'Forward', 'left', 'right'
-        self.act_dim = 3
+        self.act_dim = 4
         self.action_space = gym.spaces.Discrete(self.act_dim)
         self.turn_steps = self.thetastep
         self.forward_steps = self.thetastep
@@ -73,13 +75,16 @@ class BreakRoom(Supervisor, gym.Env):
             0: np.array([self.move_d, self.move_d]),  # Forward
             1: np.array([0, self.move_d]) * 0.5,  # Left turn
             2: np.array([self.move_d, 0]) * 0.5,  # Right turn
+            3: np.array([-self.move_d, -self.move_d]) * 0.2,  # Right turn
         }
+
     def get_obs(self):
         new_x, new_y, _ = self._get_translation()
         rotx, roty, rotz, rota = self._get_rotation()
+        dsval = self.ds.getValue()/100
         norma = np.sign(rotz) * rota
         cosa, sina = np.cos(norma), np.sin(norma)
-        obs = np.array([new_x, new_y, rotx, roty, cosa, sina]).astype(np.float32)
+        obs = np.array([new_x, new_y, rotx, roty, cosa, sina, dsval]).astype(np.float32)
         return obs
     def steptime(self, mul=1):
         super().step(self.__timestep * mul)
@@ -113,6 +118,7 @@ class BreakRoom(Supervisor, gym.Env):
         new_x, new_y, new_z = self._get_translation()
         rotx, roty, rotz, rota = self._get_rotation()
         r_bonus = self._get_intermediate_reward(new_x, new_y)
+
         # Win condition
         win = self._check_goal(new_x, new_y)
         if win:
@@ -120,6 +126,7 @@ class BreakRoom(Supervisor, gym.Env):
             reward, terminated, truncated = 1, True, False
         else:
             reward, terminated, truncated = 0 + r_bonus, False, False
+
         # Stuck detection
         dpos = np.sqrt((new_x - self.x) ** 2 + (new_y - self.y) ** 2)
         stuck_count = dpos < self.stuck_epsilon
@@ -132,6 +139,7 @@ class BreakRoom(Supervisor, gym.Env):
             print("\n================== Robot is stuck =================================\n")
             print('stuck_m = %0.4f'%(self.stuck_m))
             reward, terminated, truncated = -0.01, False, True
+
         # Fallen detection
         fallen = (np.abs(rotx) > self.fallen_thresh) | (np.abs(roty) > self.fallen_thresh)
         if fallen:
@@ -232,9 +240,9 @@ class BreakRoom(Supervisor, gym.Env):
 class OmniscientLearner(BreakRoom):
     def __init__(self, max_episode_steps=1000, use_ds=True,  spawn='all', goal='hard'):
         super(OmniscientLearner, self).__init__(max_episode_steps, use_ds, spawn, goal)
-        lowBox = np.array([-7, -3, -1, -1, -1, -1], dtype=np.float32)
-        highBox = np.array([7,  5,  1,  1, 1, 1], dtype=np.float32)
-        self.obs_dim = 6
+        lowBox = np.array([-7, -3, -1, -1, -1, -1, 0], dtype=np.float32)
+        highBox = np.array([7,  5,  1,  1, 1, 1, 1], dtype=np.float32)
+        self.obs_dim = 7
         self.observation_space = gym.spaces.Box(lowBox, highBox, shape=(self.obs_dim,))
 
 class Forest(Supervisor, gym.Env):
@@ -546,13 +554,13 @@ class ImageSampler(Forest):
         return 0
 
 
-class OmniscientLearner(Forest):
-    def __init__(self, max_episode_steps=1000, use_ds=True,  spawn='all'):
-        super(OmniscientLearner, self).__init__(max_episode_steps, use_ds, spawn)
-        lowBox = np.array([-16.5, -8.7, -1, -1, -1, -1], dtype=np.float32)
-        highBox = np.array([8.7,  17,  1,  1, 1, 1], dtype=np.float32)
-        self.obs_dim = 6
-        self.observation_space = gym.spaces.Box(lowBox, highBox, shape=(self.obs_dim,))
+# class OmniscientLearner(Forest):
+#     def __init__(self, max_episode_steps=1000, use_ds=True,  spawn='all'):
+#         super(OmniscientLearner, self).__init__(max_episode_steps, use_ds, spawn)
+#         lowBox = np.array([-16.5, -8.7, -1, -1, -1, -1], dtype=np.float32)
+#         highBox = np.array([8.7,  17,  1,  1, 1, 1], dtype=np.float32)
+#         self.obs_dim = 6
+#         self.observation_space = gym.spaces.Box(lowBox, highBox, shape=(self.obs_dim,))
 
 
 
