@@ -13,8 +13,9 @@ from hipposlam.utils import read_pickle
 # Paths
 save_dir = join('data', 'OmniscientLearner')
 offline_data_pth = join(save_dir, 'NaiveController_ReplayBuffer.pickle')
-save_ckpt_pth = join(save_dir, 'OfflineTrained_CKPT.pt')
-loss_records_pth = join(save_dir, 'OfflineTrained_LOSS.png')
+train_tag = '_clip-1.0'
+save_ckpt_pth = join(save_dir, 'OfflineTrained_CKPT%s.pt'%train_tag)
+loss_records_pth = join(save_dir, 'OfflineTrained_LOSS%s.png'%train_tag)
 
 # Paramters
 obs_dim = 7
@@ -22,14 +23,14 @@ act_dim = 4
 gamma = 0.99
 lam = 1
 use_adv = True
-batch_size = 1024
+batch_size = 2048
 max_buffer_size = 150000
 Niters = 50000
 
 # Initialize Networks
-critic = MLP(obs_dim, act_dim, [128, 128])
-critic_target = MLP(obs_dim, act_dim, [128, 128])
-actor = MLP(obs_dim, act_dim, [128, 64])
+critic = MLP(obs_dim, act_dim, [128, 128], hidden_act='Tanh')
+critic_target = MLP(obs_dim, act_dim, [128, 128], hidden_act='Tanh')
+actor = MLP(obs_dim, act_dim, [128, 64], hidden_act='Tanh')
 
 
 # Initialize Replay buffer
@@ -47,6 +48,7 @@ agent = AWAC(critic, critic_target, actor,
              critic_lr=1e-4,  # 5e-4
              actor_lr=1e-4,  # 5e-4
              weight_decay=0,
+             clip_max_norm=1.0,
              use_adv=True)
 
 # Load offline data and add to replay buffer

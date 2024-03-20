@@ -177,6 +177,7 @@ class AWAC(nn.Module):
                  critic_lr: float = 3 * 1e-4,
                  actor_lr: float = 3 * 1e-4,
                  weight_decay: float = 1e-5,
+                 clip_max_norm: float = 1.0,
                  use_adv: bool = False):
         super(AWAC, self).__init__()
 
@@ -193,6 +194,7 @@ class AWAC(nn.Module):
         self.tau = tau
         self.gamma = gamma
         self.num_action_samples = num_action_samples
+        self.clip_max_norm = clip_max_norm
         self.use_adv = use_adv
 
     def get_action(self, state, num_samples: int = 1):
@@ -233,6 +235,7 @@ class AWAC(nn.Module):
         loss = F.mse_loss(q_val, q_target)  # (N, 1) -> scalar
         self.critic_opt.zero_grad()
         loss.backward()
+        nn.utils.clip_grad_norm_(self.critic.parameters(), self.clip_max_norm)
         self.critic_opt.step()
 
         # target network update
@@ -273,6 +276,7 @@ class AWAC(nn.Module):
 
         self.actor_opt.zero_grad()
         loss.backward()
+        nn.utils.clip_grad_norm_(self.actor.parameters(), self.clip_max_norm)
         self.actor_opt.step()
         return loss
 
@@ -287,6 +291,7 @@ class AWAC(nn.Module):
             'tau': self.tau,
             'gamma': self.gamma,
             'num_action_samples': self.num_action_samples,
+            'clip_max_norm': self.clip_max_norm,
             'use_adv': self.use_adv,
         }
         torch.save(ckpt_dict, pth)
@@ -302,6 +307,7 @@ class AWAC(nn.Module):
         self.tau = checkpoint['tau']
         self.gamma = checkpoint['gamma']
         self.num_action_samples = checkpoint['num_action_samples']
+        self.clip_max_norm = checkpoint['clip_max_norm']
         self.use_adv = checkpoint['use_adv']
 
 

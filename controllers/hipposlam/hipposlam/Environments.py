@@ -30,6 +30,8 @@ class BreakRoom(Supervisor, gym.Env):
         self.spawn_mode = spawn  # 'all' or 'start'
         self.goal_mode = goal  # 'easy' or 'hard'
         self.use_ds = use_ds
+        self.x_norm = 6  # Normalize value for neural network training
+        self.y_norm = 4  # Normalize value for neural network training
         # Environment specific
         self.__timestep = int(self.getBasicTimeStep())  # default 32ms
         self.thetastep = self.__timestep * 32  # 32 * 32 = 1024 ms
@@ -84,7 +86,7 @@ class BreakRoom(Supervisor, gym.Env):
         dsval = self.ds.getValue()/100
         norma = np.sign(rotz) * rota
         cosa, sina = np.cos(norma), np.sin(norma)
-        obs = np.array([new_x, new_y, rotx, roty, cosa, sina, dsval]).astype(np.float32)
+        obs = np.array([new_x/self.x_norm, new_y/self.y_norm, rotx, roty, cosa, sina, dsval]).astype(np.float32)
         return obs
     def steptime(self, mul=1):
         super().step(self.__timestep * mul)
