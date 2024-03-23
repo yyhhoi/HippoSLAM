@@ -78,18 +78,17 @@ class EmbeddingImageDatasetAll(EmbeddingImageDataset):
 
 
 class ContrastiveEmbeddingDataloader:
-    def __init__(self, load_annotation_pth, load_embed_dir, batchsize, datainds, dist_thresh=0.1, adiff_thresh=0.1):
+    def __init__(self, load_annotation_pth, load_embed_dir, batchsize, datainds):
         self.load_annotation_pth = load_annotation_pth
         self.load_embed_dir = load_embed_dir
         self.batchsize = batchsize
-        self.dist_thresh= dist_thresh
-        self.adiff_thresh = adiff_thresh
+        self.dist_thresh= 1
+        self.adiff_thresh = np.pi/12
         self.embed_all = torch.load(join(self.load_embed_dir, 'all.pt'))[datainds[0]:datainds[1], ...]
         labels_df = pd.read_csv(load_annotation_pth, header=0)
+        self.labels_xya = torch.from_numpy(labels_df[['x', 'y', 'a']].to_numpy())[datainds[0]:datainds[1], ...]
+        assert self.embed_all.shape[0] == self.labels_xya.shape[0]
 
-        self.labels_xya = torch.from_numpy(labels_df[list('xya')].to_numpy())[datainds[0]:datainds[1], ...]
-        self.xmin, self.ymin = torch.min(self.labels_xya[:, [0, 1]], dim=0)[0]
-        self.xmax, self.ymax = torch.max(self.labels_xya[:, [0, 1]], dim=0)[0]
 
     def __len__(self):
         return self.embed_all.shape[0]
@@ -105,15 +104,14 @@ class ContrastiveEmbeddingDataloader:
             data = self.embed_all[randinds, :]
             labels = self.labels_xya[randinds, :]
             sim_mask, dissim_mask = self._compute_contrastive_masks(labels[:, 0], labels[:, 1], labels[:, 2])
-            yield (data, labels), (sim_mask, dissim_mask)
+
+            yield data, labels, sim_mask, dissim_mask
 
 
     def _compute_contrastive_masks(self, x, y, a):
-        xnorm = (x-self.xmin)/(self.xmax-self.xmin)
-        ynorm = (y-self.ymin)/(self.ymax-self.ymin)
-        adiff = torch.abs(torch.from_numpy(cdiff(a.reshape(-1, 1), a.reshape(1, -1)))) / torch.pi
-        posdist = torch.sqrt((xnorm.reshape(-1, 1) - xnorm.reshape(1, -1)) ** 2 + (
-                    ynorm.reshape(-1, 1) - ynorm.reshape(1, -1)) ** 2) / math.sqrt(2)
+        adiff = torch.abs(cdiff(a.reshape(-1, 1), a.reshape(1, -1)))
+        posdist = torch.sqrt((x.reshape(-1, 1) - x.reshape(1, -1)) ** 2 + (
+                    y.reshape(-1, 1) - y.reshape(1, -1)) ** 2) / math.sqrt(2)
         sim_mask_tmp = ((posdist < self.dist_thresh) & (adiff < self.adiff_thresh)).to(torch.uint8)  # (N, N)
         no_diag_mask = 1 - torch.eye(sim_mask_tmp.shape[0]).to(torch.uint8)
         sim_mask = sim_mask_tmp & no_diag_mask  # (N, N). dtype=torch.uint8

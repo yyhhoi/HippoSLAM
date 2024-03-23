@@ -13,7 +13,8 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, random_split
 from torchvision.io import read_image
-from .DataLoaders import WebotsImageDataset, EmbeddingImageDataset, EmbeddingImageDatasetAll, LocalContrastiveEmbeddingDataloader
+from .DataLoaders import WebotsImageDataset, EmbeddingImageDataset, EmbeddingImageDatasetAll, \
+    LocalContrastiveEmbeddingDataloader, ContrastiveEmbeddingDataloader
 import logging
 from glob import glob
 
@@ -279,29 +280,29 @@ def TrainContrastiveVAE(con_mul=0.1):
     data_dir = join('data', 'VAE')
     load_embed_dir = join(data_dir, 'embeds')
     load_annotation_pth = join(data_dir, 'annotations.csv')
-    model_tag = f'LocalContrastiveVAEmul=%0.4f' %con_mul
+    model_tag = f'ContrastiveVAEmul=%0.4f' %con_mul
     save_dir = join(data_dir, 'model', model_tag)
     os.makedirs(save_dir, exist_ok=True)
 
     # Prepare datasets
-    train_dataloader = LocalContrastiveEmbeddingDataloader(load_annotation_pth, load_embed_dir,2, [0, 8000])
-    test_dataloader = LocalContrastiveEmbeddingDataloader(load_annotation_pth, load_embed_dir,2, [8000, 10032])
+    train_dataloader = ContrastiveEmbeddingDataloader(load_annotation_pth, load_embed_dir, 256, [0, 8000])
+    test_dataloader = ContrastiveEmbeddingDataloader(load_annotation_pth, load_embed_dir, 256, [8000, 10032])
 
 
     # Model & Set-up
     vaelearner = ContrastiveVAELearner(
-        input_dim=576,
-        hidden_dims=[400, 200, 100, 50, 25],
-        con_margin=0.1,
-        con_mul=con_mul,
+        input_dim= 576,
+        hidden_dims= [400, 200, 100, 50, 25],
+        con_margin= 0.1,
+        con_mul= con_mul,
         dismul = 0.5,
-        lr=0.001,
+        lr = 0.001,
         lr_gamma=0.98,
         weight_decay=0
     )
 
-    cycle_nums = 5
-    num_epoches = 20
+    cycle_nums = 10
+    num_epoches = 50
     betas = np.linspace(0, 1, num_epoches)
 
     keys = [f'{a}_{b}' for a in ['recon', 'kld', 'con'] for b in ['train', 'test']]
@@ -339,8 +340,8 @@ def TrainContrastiveVAE(con_mul=0.1):
 
 
             avers_dict = epoch_recorder.return_avers()
-            for key, item in avers_dict.items():
-                print(f'{key}: {item: 0.4f}')
+            # for key, item in avers_dict.items():
+            #     print(f'{key}: {item: 0.4f}')
             loss_recorder.record(**avers_dict)
             loss_recorder.record(lr=vaelearner.lr_opt.get_last_lr()[0], beta=betas[ei])
             # vaelearner.lr_opt.step()

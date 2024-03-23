@@ -164,27 +164,86 @@ def StartOnlineA2C():
     fig.savefig(save_plot_pth, dpi=200)
 
 
-
-def naive_avoidance():
+def random_agent():
     # Paths
-    save_dir = join('data', 'OmniscientLearner')
+    save_dir = join('data', 'RandomAgent')
     os.makedirs(save_dir, exist_ok=True)
-    model_name = 'NaiveController'
-    save_replay_pth = join('data', 'OmniscientLearner', '%s_ReplayBuffer.pickle'%model_name)
-    save_record_pth = join('data', 'OmniscientLearner', '%s_Performance.csv'%model_name)
+    model_name = 'RandomAgent'
+    save_trajall_pth = join(save_dir, '%s_TrajectoryRecords.csv' % model_name)
 
     # Environment
     env = OmniscientLearner(spawn='start', goal='hard')
 
+    # Record trajectory data
+    PRtrajall = Recorder('i', 't', 'x', 'y', 'cosa', 'sina', 'r', 'done', 'truncated')
+
+    cum_end = 0
+    i = 0
+    maxtimeout = 1000
+    while cum_end <= 100:
+        print('Iter %d, cum_end = %d'%(i, cum_end))
+        s, _ = env.reset()
+        t = 0
+        while True:
+
+            # Policy
+            a = int(np.random.choice(4))
+
+            # Step
+            snext, r, done, truncated, info = env.step(a)
+
+            # Store data
+            PRtrajall.record(i=i, t=t, x=s[0], y=s[1], cosa=s[4], sina=s[5], r=r, done=int(done), truncated=int(truncated))
+
+
+            # Increment
+            s = snext
+            t += 1
+
+            # Termination condition
+            if done or (t >= maxtimeout) or truncated:
+                msg = "Done" if done else "Timeout/Stuck"
+                cum_end += 1
+                print(msg)
+                break
+
+
+
+        if r > 0:
+            cum_end += 1
+        i += 1
+
+    # Saving
+    PRtrajall.to_csv(save_trajall_pth)
+
+
+
+
+def naive_avoidance():
+    # Paths
+    save_dir = join('data', 'NaiveControllerDemo')
+    os.makedirs(save_dir, exist_ok=True)
+    model_name = 'NaiveControllerDemo'
+    save_replay_pth = join('data', 'OmniscientLearner', '%s_ReplayBuffer.pickle'%model_name)
+    save_record_pth = join('data', 'OmniscientLearner', '%s_Performance.csv'%model_name)
+    save_trajall_pth = join(save_dir, '%s_TrajectoryRecords.csv' % model_name)
+
+    # Environment
+    env = OmniscientLearner(spawn='start', goal='hard')
+    x_norm = env.x_norm
+    y_norm = env.y_norm
     # Record data and epsidoes
     PRtraj = Recorder('i', 't', 'r', 'done')
+
+    # Record trajectory data
+    PRtrajall = Recorder('i', 't', 'x', 'y', 'cosa', 'sina', 'r', 'done', 'truncated')
 
     data = {'episodes':[], 'end_r':[], 't':[]}
     cum_win = 0
     i = 0
-    maxtimeout = 300
-    while cum_win <= 100:
-        print('Iter %d, cum_win = %d'%(len(data['end_r']), cum_win))
+    maxtimeout = 500
+    while cum_win <= 50:
+        print('Iter %d, cum_win = %d'%(i, cum_win))
         s, _ = env.reset()
         exp_list = []
         t = 0
@@ -192,18 +251,20 @@ def naive_avoidance():
 
             # Policy
             dsval = env.ds.getValue()
-            a = breakroom_avoidance_policy(s[0], s[1], dsval, 0.3)
+            a = breakroom_avoidance_policy(s[0]*x_norm, s[1]*y_norm, dsval, 0.3)
 
             # Step
             snext, r, done, truncated, info = env.step(a)
 
             # Store data
-            try:
-                experience = np.concatenate([
-                    s, np.array([a]), snext, np.array([r]), np.array([done])
-                ])
-            except:
-                breakpoint()
+            PRtrajall.record(i=i, t=t, x=s[0], y=s[1], cosa=s[4], sina=s[5], r=r, done=int(done), truncated=int(truncated))
+
+
+            # Store data
+            experience = np.concatenate([
+                s, np.array([a]), snext, np.array([r]), np.array([done])
+            ])
+
             exp_list.append(experience)
 
 
@@ -214,32 +275,35 @@ def naive_avoidance():
             # Termination condition
             if done or (t >= maxtimeout) or truncated:
                 msg = "Done" if done else "Timeout/Stuck"
+                if done:
+                    cum_win += 1
+
                 print(msg)
                 break
 
-        PRtraj.record(i=i, t=t, r=r, done=int(done))
+        # PRtraj.record(i=i, t=t, r=r, done=int(done))
         # Store data
         data['episodes'].append(np.vstack(exp_list))
         data['end_r'].append(r)
         data['t'].append(t)
-        if r > 0:
-            cum_win += 1
+
         i += 1
 
     # Saving
     save_pickle(save_replay_pth, data)
-    PRtraj.to_csv(save_record_pth)
+    # PRtraj.to_csv(save_record_pth)
+    PRtrajall.to_csv(save_trajall_pth)
 
 def fine_tune_trained_model():
     # Modes
     load_expert_buffer = False
-    save_replay_buffer = False
+    save_replay_buffer = True
 
     # Paths
     save_dir = join('data', 'OmniscientLearner')
     os.makedirs(save_dir, exist_ok=True)
-    load_model_name = 'OfflineTrained_clip-1.0'
-    save_model_name = 'Finetuned1'
+    load_model_name = 'Finetuned8'
+    save_model_name = 'Finetuned9'
     offline_data_pth = join(save_dir, 'NaiveController_ReplayBuffer.pickle')
     load_ckpt_pth = join(save_dir, '%s_CKPT.pt' % load_model_name)
     save_ckpt_pth = join(save_dir, '%s_CKPT.pt' % save_model_name)
@@ -253,7 +317,7 @@ def fine_tune_trained_model():
     gamma = 0.99
     lam = 1
     batch_size = 1024
-    max_buffer_size = 5000
+    max_buffer_size = 10000
 
     # Initialize models
     critic = MLP(obs_dim, act_dim, [128, 128], hidden_act='Tanh')
@@ -290,7 +354,7 @@ def fine_tune_trained_model():
     PR = Recorder('i', 't', 'r', 'done', 'closs', 'aloss')
 
 
-    Niters = 500
+    Niters = 1000
     maxtimeout = 300
     for i in range(Niters):
         print('Episode %d/%d'%(i, Niters))
@@ -359,10 +423,15 @@ def fine_tune_trained_model():
 def evaluate_trained_model():
 
     # Paths
-    save_dir = join('data', 'OmniscientLearner')
-    model_name = 'OfflineTrained_clip-1.0'
-    load_ckpt_pth = join(save_dir, '%s_CKPT.pt'%(model_name))
-    save_record_pth = join(save_dir, '%s.csv'%(model_name))
+    model_name = 'Finetuned9'
+    load_ckpt_pth = join('data', 'OmniscientLearner', '%s_CKPT.pt'%(model_name))
+
+    eval_project_tag = 'Finetuned9Demo'
+    save_record_dir = join('data', eval_project_tag)
+    os.makedirs(save_record_dir, exist_ok=True)
+    save_record_pth = join(save_record_dir, '%s_Performance.csv'%eval_project_tag)
+    save_trajall_pth = join(save_record_dir, '%s_TrajectoryRecords.csv' % eval_project_tag)
+
 
     # Parameters
     obs_dim = 7
@@ -391,9 +460,11 @@ def evaluate_trained_model():
     # Environment
     env = OmniscientLearner(spawn='start', goal='hard')
     PRtraj = Recorder('i', 't', 'r')
+    PRtrajall = Recorder('i', 't', 'x', 'y', 'cosa', 'sina', 'r', 'done', 'truncated')
+
 
     # Unroll
-    Niters = 100
+    Niters = 300
     maxtimeout = 300
     for i in range(Niters):
         print('Episode %d/%d'%(i, Niters))
@@ -411,6 +482,11 @@ def evaluate_trained_model():
             # Record
             PRtraj.record(i=i, t=t, r=r)
 
+            # Store data
+            stmp = s.numpy().squeeze()
+            PRtrajall.record(i=i, t=t, x=stmp[0].item(), y=stmp[1], cosa=stmp[4], sina=stmp[5], r=r, done=int(done), truncated=int(truncated))
+
+
             # Increment
             s = snext
             t += 1
@@ -422,14 +498,16 @@ def evaluate_trained_model():
                 break
 
     # Saving
-    PRtraj.to_csv()
+    PRtraj.to_csv(save_record_pth)
+    PRtrajall.to_csv(save_trajall_pth)
 
 
 def main():
     # naive_avoidance()
-    # evaluate_trained_model()
-    fine_tune_trained_model()
+    evaluate_trained_model()
+    # fine_tune_trained_model()
     # StartOnlineA2C()
     # SB_PPO_Train()
+    # random_agent()
 if __name__ == '__main__':
     main()

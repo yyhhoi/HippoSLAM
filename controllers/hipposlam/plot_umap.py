@@ -117,14 +117,14 @@ def plot_umap_vae():
     mu_test_tmp = []
     labels_train_tmp = []
     labels_test_tmp = []
-    for (x_train, label_train), _ in train_dataloader.iterate():
+    for x_train, label_train, _, _ in train_dataloader.iterate():
         _, _, (y, mu_train, _) = vaelearner.infer(x_train, 1)
         mu_train_tmp.append(mu_train)
         labels_train_tmp.append(label_train)
     mus_train = torch.vstack(mu_train_tmp)
     labels_train = torch.vstack(labels_train_tmp)
 
-    for (x_test, label_test), _ in test_dataloader.iterate():
+    for x_test, label_test, _, _ in test_dataloader.iterate():
         _, _, (y, mu_test, _) = vaelearner.infer(x_test, 1)
         mu_test_tmp.append(mu_test)
         labels_test_tmp.append(label_test)
@@ -143,5 +143,5 @@ if __name__ == '__main__':
     #     print(f'\n {kld_mul:0.6f}')
     #     plot_umap(kld_mul)
     #     print()
-
-    plot_umap_onlyEmbed()
+    plot_umap_vae()
+    # plot_umap_onlyEmbed()
