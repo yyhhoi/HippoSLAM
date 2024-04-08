@@ -246,7 +246,7 @@ class OmniscientLearner(BreakRoom):
         self.observation_space = gym.spaces.Box(lowBox, highBox, shape=(self.obs_dim,))
 
 class Forest(Supervisor, gym.Env):
-    def __init__(self, max_episode_steps=300, use_ds=True,  spawn='all'):
+    def __init__(self, maxt=300):
         super().__init__()
 
         # ====================== To be defined by child class ========================================
@@ -254,16 +254,14 @@ class Forest(Supervisor, gym.Env):
         self.observation_space = None
         # ============================================================================================
 
-        self.spec = gym.envs.registration.EnvSpec(id='WeBotsQ-v0', max_episode_steps=max_episode_steps)
-        self.spawn_mode = spawn  # 'all' or 'start'
-        self.use_ds = use_ds
+        self.spec = gym.envs.registration.EnvSpec(id='WeBotsQ-v0', max_episode_steps=maxt)
 
         # Environment specific
         self.__timestep = int(self.getBasicTimeStep())  # default 32ms
         self.thetastep = self.__timestep * 32  # 32 * 32 = 1024 ms
         self.r_bonus_counts = [0] * 4
         self.t = 0  # reset to 0, +1 every time self.step() is called.
-        self.maxt = max_episode_steps
+        self.maxt = maxt
 
         # Supervisor
         self.supervis = self.getSelf()
@@ -284,11 +282,6 @@ class Forest(Supervisor, gym.Env):
         self.fallen_seq = 0
         self.fallen_thresh = 1
 
-        # Distance sensor or bumper
-        if self.use_ds:
-            self.ds = []
-            self.ds = self.getDevice('ds2')  # Front sensor
-            self.ds.enable(self.__timestep * 4)
 
         # Wheels
         self.leftMotor1 = self.getDevice('wheel1')
@@ -460,28 +453,16 @@ class Forest(Supervisor, gym.Env):
 
 
     def _spawn(self):
-        # x, -15 - 7.5
-        # y, -0.5, 15
-        if self.spawn_mode == "start":
 
-            x = np.random.uniform(2.2, 4.2, size=1)
-            y = np.random.uniform(7, 9, size=1)
-            z = 0.1
-        elif self.spawn_mode == "all":
-            pts = np.array([
-                (-3, 5, 0.07),
-                (-11.6, 7.17, 0.2),
-                (-0.6, -3.43, 0.18),
-            ])
-            pti = np.random.choice(len(pts))
-            x, y, z = pts[pti]
-            pass
-
-        else:
-            raise ValueError('Spawn mode must be either "start" or "all".')
+        pts = np.array([
+            (-3, 5, 0.07),
+            (-11.6, 7.17, 0.2),
+            (-0.6, -3.43, 0.18),
+        ])
+        pti = np.random.choice(len(pts))
+        x, y, z = pts[pti]
 
         a = np.random.uniform(-np.pi, np.pi, size=1)
-
         return float(x), float(y), z, float(a)
 
     def _reset_pose(self):
@@ -494,7 +475,7 @@ class Forest(Supervisor, gym.Env):
 class ImageSampler(Forest):
 
     def __init__(self):
-        super().__init__(max_episode_steps=300, use_ds=False,  spawn='all')
+        super().__init__(maxt=300)
 
         # Camera
         self.camera_timestep = int(self.getBasicTimeStep())
@@ -566,8 +547,8 @@ class ImageSampler(Forest):
 
 
 class EmbeddingLearner(Forest):
-    def __init__(self, embedding_dim, max_episode_steps=1000, use_ds=False,  spawn='all'):
-        super(EmbeddingLearner, self).__init__(max_episode_steps, use_ds, spawn)
+    def __init__(self, embedding_dim, maxt=1000):
+        super(EmbeddingLearner, self).__init__(maxt)
         lowBox = np.ones(embedding_dim).astype(np.float32) * -10.0
         highBox = np.ones(embedding_dim).astype(np.float32) * 10.0
         self.obs_dim = embedding_dim
@@ -595,9 +576,9 @@ class EmbeddingLearner(Forest):
 
 
 class StateMapLearner(Forest):
-    def __init__(self, R=5, L=10, max_episode_steps=1000, max_hipposlam_states=500, use_ds=True, spawn='all',
+    def __init__(self, R=5, L=10, maxt=1000, max_hipposlam_states=500,
                  save_hipposlam_pth=None, save_trajdata_pth=None):
-        super(StateMapLearner, self).__init__(max_episode_steps, use_ds, spawn)
+        super(StateMapLearner, self).__init__(maxt)
         self.observation_space = gym.spaces.Discrete(max_hipposlam_states)
 
         # Camera
@@ -740,11 +721,11 @@ class StateMapLearner(Forest):
 
 
 class StateMapLearnerEmbedding(StateMapLearner):
-    def __init__(self, R=5, L=10, max_episode_steps=1000, max_hipposlam_states=500, use_ds=True, spawn='all',
+    def __init__(self, R=5, L=10, maxt=1000, max_hipposlam_states=500,
                  save_hipposlam_pth=None, save_trajdata_pth=None):
 
 
-        super().__init__(R, L, max_episode_steps, max_hipposlam_states, use_ds, spawn,
+        super().__init__(R, L, maxt, max_hipposlam_states,
                          save_hipposlam_pth = save_hipposlam_pth, save_trajdata_pth= save_trajdata_pth)
         # Embedding
         self.imgconverter = WebotImageConvertor(self.cam_height, self.cam_width)
@@ -812,9 +793,9 @@ class StateMapLearnerEmbedding(StateMapLearner):
 class StateMapLearnerTaught(StateMapLearner):
 
 
-    def __init__(self, R=5, L=10, max_episode_steps=1000, use_ds=True, spawn='all', save_hipposlam_pth=None, save_trajdata_pth=None):
+    def __init__(self, R=5, L=10, maxt=1000, save_hipposlam_pth=None, save_trajdata_pth=None):
 
-        super(StateMapLearnerTaught, self).__init__(R, L, max_episode_steps, 1, use_ds, spawn,
+        super(StateMapLearnerTaught, self).__init__(R, L, maxt, 1,
                                                     save_hipposlam_pth = save_hipposlam_pth, save_trajdata_pth= save_trajdata_pth)
 
         self.xbound = (-6.4, 8.4)
@@ -894,10 +875,10 @@ class StateMapLearnerTaught(StateMapLearner):
 
 
 class StateMapLearnerSnodes(StateMapLearner):
-    def __init__(self, R=5, L=10, max_episode_steps=1000, max_hipposlam_states=500, use_ds=True, spawn='all',
+    def __init__(self, R=5, L=10, maxt=1000, max_hipposlam_states=500,
                  save_hipposlam_pth=None):
-        super(StateMapLearnerSnodes, self).__init__(R, L, max_episode_steps, max_hipposlam_states, use_ds, spawn,
-                                                          save_hipposlam_pth=save_hipposlam_pth)
+        super(StateMapLearnerSnodes, self).__init__(R, L, maxt, max_hipposlam_states,
+                                                    save_hipposlam_pth=save_hipposlam_pth)
         self.obs_dim = max_hipposlam_states
         lowBox = np.zeros(self.obs_dim).astype(np.float32)
         highBox = np.ones(self.obs_dim).astype(np.float32)

@@ -47,9 +47,9 @@ def SB_PPO_Train():
     # save_trajdata_pth = None
 
     # Environment
-    # env = StateMapLearnerEmbedding(R=5, L=20, max_hipposlam_states=1000, use_ds=False, spawn='all',
+    # env = StateMapLearnerEmbedding(R=5, L=20, max_hipposlam_states=1000,
     #                                  save_hipposlam_pth=save_hipposlam_pth, save_trajdata_pth=save_trajdata_pth)
-    env = StateMapLearnerTaught(R=5, L=20, use_ds=False, spawn='all',
+    env = StateMapLearnerTaught(R=5, L=20,
                                      save_hipposlam_pth=save_hipposlam_pth, save_trajdata_pth=save_trajdata_pth)
 
 
@@ -104,7 +104,7 @@ def SB_PPO_Train_Embedding():
     save_model_pth = join(save_dir, '%s.zip' % (save_model_name))
 
     # Environment
-    env = EmbeddingLearner(embedding_dim=576, spawn='all', max_episode_steps=350, use_ds=False)
+    env = EmbeddingLearner(embedding_dim=576, spawn='all', maxt=350, use_ds=False)
 
     check_env(env)
 
