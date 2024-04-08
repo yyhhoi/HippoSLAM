@@ -523,8 +523,8 @@ def main():
     # naive_avoidance()
     # evaluate_trained_model()
     # fine_tune_trained_model()
-    # SB_PPO_Train()
-    ImageSampling()
+    SB_PPO_Train()
+    # ImageSampling()
     # SB_PPO_Eval()
     # SB_PPO_Train_Embedding()
     return None
