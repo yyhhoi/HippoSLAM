@@ -103,7 +103,7 @@ class WebotImageConvertor:
         self.width = width
 
     def to_torch_RGB(self, imagebytes):
-        out = torch.tensor(bytearray(imagebytes)).reshape((self.height, self.width, 4)) / 255
+        out = torch.tensor(bytearray(imagebytes)).reshape((self.height, self.width, 4)) / 255  # BGRA
         out = torch.flip(out, dims=[2])  # Convert the last channel to ARGB
         out = out[:, :, 1:]  # Use only RGB channels. Discard alpha channel
         out = torch.permute(out, [2, 0, 1])  # -> (RGB, height, width) as required

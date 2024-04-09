@@ -15,7 +15,7 @@ from hipposlam.Networks import MLP
 # from hipposlam.ReinforcementLearning import AWAC, A2C, compute_discounted_returns
 from hipposlam.Replay import ReplayMemoryAWAC, ReplayMemoryA2C
 from hipposlam.utils import breakroom_avoidance_policy, save_pickle, Recorder, read_pickle
-from hipposlam.Environments import StateMapLearner, StateMapLearnerTaught, EmbeddingLearner, StateMapLearnerEmbedding, ImageSampler
+from hipposlam.Environments import StateMapLearner, StateMapLearnerTaught, EmbeddingLearner, StateMapLearnerUmapEmbedding, ImageSampler
 from os.path import join
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
@@ -34,7 +34,7 @@ def SB_PPO_Train():
     model_class = PPO
 
     # Paths
-    save_dir = join('data', 'StateMapLearnerTaught_L20')
+    save_dir = join('data', 'StateMapLearnerTaught_SepNorm')
     os.makedirs(save_dir, exist_ok=True)
     load_model_name = ''
     save_model_name = 'PPO1'
@@ -47,7 +47,7 @@ def SB_PPO_Train():
     # save_trajdata_pth = None
 
     # Environment
-    # env = StateMapLearnerEmbedding(R=5, L=20, max_hipposlam_states=1000,
+    # env = StateMapLearnerUmapEmbedding(R=5, L=20, max_hipposlam_states=1000,
     #                                  save_hipposlam_pth=save_hipposlam_pth, save_trajdata_pth=save_trajdata_pth)
     env = StateMapLearnerTaught(R=5, L=20,
                                      save_hipposlam_pth=save_hipposlam_pth, save_trajdata_pth=save_trajdata_pth)
@@ -79,7 +79,7 @@ def SB_PPO_Train():
         model = model_class("MlpPolicy", env, verbose=1)
 
     # Train
-    model.learn(total_timesteps=50000, callback=None)
+    model.learn(total_timesteps=250000, callback=None)
 
     # Save models
     if save_model:

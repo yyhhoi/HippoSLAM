@@ -3,12 +3,13 @@ import os
 from os.path import join
 from pprint import PrettyPrinter
 
+import joblib
 import numpy as np
 import torch
 from skimage.io import imsave
 from sklearn.decomposition import IncrementalPCA
 from stable_baselines3.common.callbacks import CheckpointCallback
-
+from umap.parametric_umap import load_ParametricUMAP
 from controller import Supervisor
 import gymnasium as gym
 
@@ -515,7 +516,7 @@ class ImageSampler(Forest):
         if (self.t % 5 == 0):
             # print('Save image and data. c=%d'%self.c)
             img_bytes = self.cam.getImage()
-            img = np.array(bytearray(img_bytes)).reshape(self.cam_height, self.cam_width, 4)
+            img = np.array(bytearray(img_bytes)).reshape(self.cam_height, self.cam_width, 4)  # BGRA
             img = img[:, :, [2, 1, 0, 3]]
 
             save_img_pth = join(self.save_img_dir, f'{self.c}.png')
@@ -720,7 +721,7 @@ class StateMapLearner(Forest):
         return hippodata
 
 
-class StateMapLearnerEmbedding(StateMapLearner):
+class StateMapLearnerVAEEmbedding(StateMapLearner):
     def __init__(self, R=5, L=10, maxt=1000, max_hipposlam_states=500,
                  save_hipposlam_pth=None, save_trajdata_pth=None):
 
@@ -763,21 +764,7 @@ class StateMapLearnerEmbedding(StateMapLearner):
                 _, mu, _ = self.vaelearner.vae(embedding.unsqueeze(0))
             vae_embed = mu.squeeze().detach().numpy().copy()
             self.hippomap.learn_embedding(self.hipposeq.X, vae_embed, far_ids=far_ids)
-            # self.embedding_buffer.append(embedding.numpy().copy())
-            # if len(self.embedding_buffer) > self.n_components:
-            #     print('Partially fitting PCA')
-            #     self.pca.partial_fit(np.stack(self.embedding_buffer))
-            #     self.embedding_buffer = []
-            #     print(f'Total exlained variance = {self.pca.explained_variance_ratio_.sum()}')
-            #
-            # try:
-            #     embedding_PC = self.pca.transform(embedding.reshape(1, -1))
-            #     self.hippomap.learn_embedding(self.hipposeq.X, embedding_PC.squeeze(), far_ids=far_ids)
-            # except NotFittedError:
-            #     pass
 
-
-        # print('Interred state = %d   / %d  , val = %0.2f. F = %d, Xsum=%0.4f'%(sid+1, self.hippomap.N, Snodes[sid], self.hippomap.current_F, self.hipposeq.X.sum()))
         return sid, Snodes
 
     def save_hipposlam(self, pth):
@@ -790,6 +777,47 @@ class StateMapLearnerEmbedding(StateMapLearner):
         self.pca = hippodata['pca']
 
 
+class StateMapLearnerUmapEmbedding(StateMapLearner):
+    def __init__(self, R=5, L=10, maxt=1000, max_hipposlam_states=1000,
+                 save_hipposlam_pth=None, save_trajdata_pth=None):
+
+
+        super().__init__(R, L, maxt, max_hipposlam_states,
+                         save_hipposlam_pth = save_hipposlam_pth, save_trajdata_pth= save_trajdata_pth)
+        # Embedding
+        self.imgconverter = WebotImageConvertor(self.cam_height, self.cam_width)
+        self.imgembedder = MobileNetEmbedder()
+        self.hippomap.set_lowSthresh(0.98)
+        print('Loading Umap')
+        self.umap_model = load_ParametricUMAP('data/VAE/model/OnlyEmbed_imgs3/umap_param')
+        # self.umap_model = joblib.load((open('data/VAE/model/OnlyEmbed_imgs3/umap.sav', 'rb')))
+        self.umins = np.array([-17.670673, -16.776457])
+        self.umaxs = np.array([12.743417, 12.321048])
+        self.embedding_buffer = []
+
+
+
+    def get_obs_base(self):
+        id_list = self.recognize_objects()
+        self.hipposeq.step(id_list)
+        sid, Snodes = self.hippomap.infer_state(self.hipposeq.X)
+
+
+        # Image embedding
+        if (self.hippomap.learn_mode) and (self.t % 5 == 0) and (self.hippomap.current_F > 0):
+            # far_ids = list(self.hipposeq.far_fids.values())
+            img_bytes = self.cam.getImage()
+            img_tensor = self.imgconverter.to_torch_RGB(img_bytes)
+            embedding = self.imgembedder.infer_embedding(img_tensor)
+            umap_embed = self.umap_model.transform(embedding.unsqueeze(0).numpy()).squeeze()
+
+
+            self.hippomap.learn_embedding(self.hipposeq.X, umap_embed, self.umins, self.umaxs, far_ids=None)
+
+        return sid, Snodes
+
+
+
 class StateMapLearnerTaught(StateMapLearner):
 
 
@@ -798,8 +826,11 @@ class StateMapLearnerTaught(StateMapLearner):
         super(StateMapLearnerTaught, self).__init__(R, L, maxt, 1,
                                                     save_hipposlam_pth = save_hipposlam_pth, save_trajdata_pth= save_trajdata_pth)
 
-        self.xbound = (-6.4, 8.4)
+        # self.xbound = (-6.4, 8.4)
+        # self.ybound = (-8.6, 16.2)
+        self.xbound = (-16.4, 8.4)
         self.ybound = (-8.6, 16.2)
+
         self.dp = 2  # 2
         self.da = 2 * np.pi / 8  # 12
         self.hippoteach = StateTeacher(self.xbound, self.ybound, self.dp, self.da)
@@ -815,8 +846,7 @@ class StateMapLearnerTaught(StateMapLearner):
 
         # Teacher
         x, y, _ = self._get_translation()
-        _, _, rotz, rota = self._get_rotation()
-        a = np.sign(rotz) * rota
+        a = self._get_heading()
         sidgt = self.hippoteach.lookup_xya((x, y, a))
 
 
@@ -824,35 +854,40 @@ class StateMapLearnerTaught(StateMapLearner):
         self.hipposeq.step(id_list)
         sidpred, Snodes = self.hippomap.infer_state(self.hipposeq.X)
 
-
-
         if self.hipposeq.X.sum() < 1e-6:
             return sidpred, Snodes
 
         # print('GroundTruthState Storage = \n', self.hippoteach.pred2gt_map)
         if self.hippoteach.match_groundtruth_storage(sidgt):
-            # print(f'GroundTruthState {sidgt} found in storage')
+
+            print(f'GroundTruthState {sidgt} found in storage')
 
             if self.hippoteach.pred2gt_map[sidpred] == sidgt:
                 msg = 'Match    '
-                _ = self.hippomap.learn_supervised(self.hipposeq.X, sid=sidpred)
+                _ = self.hippomap.learn_supervised(self.hipposeq.X, sid=sidpred, far_ids=None)
             else:
                 msg = 'NOT Match'
-                _ = self.hippomap.learn_supervised(self.hipposeq.X, sid=self.hippoteach.gt2pred_map[sidgt])
+                _ = self.hippomap.learn_supervised(self.hipposeq.X, sid=self.hippoteach.gt2pred_map[sidgt], far_ids=None)
 
             # print(
                 # f'{msg} InferredState {sidpred}/{self.hippomap.N} (mappedGT={self.hippoteach.pred2gt_map[sidpred]} vs {sidgt}), val={Snodes[sidpred]}')
 
         else:
-            # print(f'GroundTruthState {sidgt} not found')
-            sidpred = self.hippomap.learn_supervised(self.hipposeq.X)
+            print(f'GroundTruthState {sidgt} not found')
+            sidpred = self.hippomap.learn_supervised(self.hipposeq.X, far_ids=None)
             Snodes = np.zeros(self.hippomap.N)
             Snodes[sidpred] = 1
             self.hippoteach.store_prediction_mapping(sidpred, sidgt)
             self.hippoteach.store_groundtruth_mapping(sidgt, sidpred)
             # print(f'New inferred state {sidpred} created.')
 
-        # print()
+
+        ## Debug: Compare prediction and ground truth
+        sidgt_frompred = self.hippoteach.map_pred_to_gt(sidpred)
+        predx, predy, preda = self.hippoteach.sid2xya(sidgt_frompred)
+        print('GT/Pred: x=%02.2f/%02.2f, y=%02.2f/%02.2f, a=%03.2f/%03.2f' % (x, predx, y, predy, np.rad2deg(a), np.rad2deg(preda)))
+        ## ============================================
+
         return sidpred, Snodes
 
         # sidgt = int(np.random.choice(self.hippoteach.Nstates))
