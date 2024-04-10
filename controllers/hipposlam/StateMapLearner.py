@@ -15,7 +15,7 @@ from hipposlam.Networks import MLP
 # from hipposlam.ReinforcementLearning import AWAC, A2C, compute_discounted_returns
 from hipposlam.Replay import ReplayMemoryAWAC, ReplayMemoryA2C
 from hipposlam.utils import breakroom_avoidance_policy, save_pickle, Recorder, read_pickle
-from hipposlam.Environments import StateMapLearner, StateMapLearnerTaught, EmbeddingLearner, StateMapLearnerUmapEmbedding, ImageSampler
+from hipposlam.Environments import StateMapLearner, StateMapLearnerTaught, EmbeddingLearner, StateMapLearnerUmapEmbedding, ImageSampler, StateMapLearnerVAEEmbedding
 from os.path import join
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
@@ -28,16 +28,16 @@ os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 def SB_PPO_Train():
     # Modes
-    load_model = False
+    load_model = True
     save_model = True
     hippomap_learn = True
     model_class = PPO
 
     # Paths
-    save_dir = join('data', 'StateMapLearnerTaught_SepNorm')
+    save_dir = join('data', 'StateMapLearnerUmapEmbedding_NewRecord')
     os.makedirs(save_dir, exist_ok=True)
-    load_model_name = ''
-    save_model_name = 'PPO1'
+    load_model_name = 'PPO5'
+    save_model_name = 'PPO6'
     load_hipposlam_pth = join(save_dir, '%s_hipposlam.pickle' % load_model_name)
     load_model_pth = join(save_dir, '%s.zip'%(load_model_name))
     save_hipposlam_pth = join(save_dir, '%s_hipposlam.pickle' % save_model_name)
@@ -47,10 +47,12 @@ def SB_PPO_Train():
     # save_trajdata_pth = None
 
     # Environment
-    # env = StateMapLearnerUmapEmbedding(R=5, L=20, max_hipposlam_states=1000,
-    #                                  save_hipposlam_pth=save_hipposlam_pth, save_trajdata_pth=save_trajdata_pth)
-    env = StateMapLearnerTaught(R=5, L=20,
+    env = StateMapLearnerUmapEmbedding(R=5, L=20, max_hipposlam_states=1000,
                                      save_hipposlam_pth=save_hipposlam_pth, save_trajdata_pth=save_trajdata_pth)
+    # env = StateMapLearnerVAEEmbedding(R=5, L=20, max_hipposlam_states=1000,
+    #                                  save_hipposlam_pth=save_hipposlam_pth, save_trajdata_pth=save_trajdata_pth)
+    # env = StateMapLearnerTaught(R=5, L=20,
+    #                                  save_hipposlam_pth=save_hipposlam_pth, save_trajdata_pth=save_trajdata_pth)
 
 
     info_keywords = ('Nstates', 'last_r', 'terminated', 'truncated', 'stuck', 'fallen', 'timeout')
@@ -79,7 +81,7 @@ def SB_PPO_Train():
         model = model_class("MlpPolicy", env, verbose=1)
 
     # Train
-    model.learn(total_timesteps=250000, callback=None)
+    model.learn(total_timesteps=25000, callback=None)
 
     # Save models
     if save_model:

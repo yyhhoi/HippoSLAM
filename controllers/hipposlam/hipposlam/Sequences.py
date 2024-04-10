@@ -187,7 +187,7 @@ class StateDecoder:
         if len(self.sid2embed) == 0:
             self.current_Sid = self.learn_supervised(X, sid=None, far_ids=far_ids)
             self.sid2embed.append(e_new.copy())
-            return None
+            return 0
 
 
         e_mat = np.stack(self.sid2embed)  # -> (Nstates, Embed_dim)
@@ -207,7 +207,7 @@ class StateDecoder:
             # Create a new state, and remember the embedding
             _ = self.learn_supervised(X, sid=None, far_ids=far_ids)
             self.sid2embed.append(e_new.copy())
-            print(f'Learn new state = {self.N}')
+            print(f'Learn new state = {self.N-1}')
 
         else:
             if maxid != self.current_Sid:
@@ -217,7 +217,7 @@ class StateDecoder:
             _ = self.learn_supervised(X, sid=maxid, far_ids=far_ids)
 
 
-        return None
+        return maxid
 
     def learn_supervised(self, X, sid=None, far_ids=None):
         """
@@ -346,7 +346,8 @@ class StateTeacher:
 
     def map_pred_to_gt(self, sid_pred):
         return self.pred2gt_map[sid_pred]
-
+    def map_gt_to_pred(self, sid_gt):
+        return self.gt2pred_map[sid_gt]
     def match_prediction_storage(self, sid_pred):
         if sid_pred in self.pred2gt_map:
             return True
