@@ -595,7 +595,7 @@ class StateMapLearner(Forest):
         self.fpos_dict = dict()
         self.obj_dist = 3  # in meters
         self.hipposeq = Sequences(R=R, L=L, reobserve=False)
-        self.hippomap = StateDecoder(R=R, L=L, maxN=max_hipposlam_states)
+        self.hippomap = StateDecoder(R=R, L=L, maxN=max_hipposlam_states, area_norm=False)
         self.hippomap.set_lowSthresh(0.2)
         self.save_trajdata_pth = save_trajdata_pth
         self.current_embedid = 0
@@ -793,7 +793,6 @@ class StateMapLearnerUmapEmbedding(StateMapLearner):
         self.hippomap.set_lowSthresh(0.98)
         print('Loading Umap')
         self.umap_model = load_ParametricUMAP('data/VAE/model/OnlyEmbed_imgs3/umap_param')
-        # self.umap_model = joblib.load((open('data/VAE/model/OnlyEmbed_imgs3/umap.sav', 'rb')))
         self.umins = np.array([-17.670673, -16.776457])
         self.umaxs = np.array([12.743417, 12.321048])
         self.embedding_buffer = []
@@ -835,7 +834,7 @@ class StateMapLearnerTaught(StateMapLearner):
         self.only_close = False
 
         # Over-write parent's attributes
-        self.hippomap = StateDecoder(R=R, L=L, maxN=self.max_Nstates)
+        self.hippomap = StateDecoder(R=R, L=L, maxN=self.max_Nstates, area_norm=False)
         self.observation_space = gym.spaces.Discrete(self.max_Nstates)
 
     def get_obs_base(self):
@@ -902,15 +901,18 @@ class StateMapLearnerTaught(StateMapLearner):
         self.hippoteach = hippodata['hippoteach']
 
 
-class StateMapLearnerSnodes(StateMapLearner):
-    def __init__(self, R=5, L=10, maxt=1000, max_hipposlam_states=500,
-                 save_hipposlam_pth=None):
-        super(StateMapLearnerSnodes, self).__init__(R, L, maxt, max_hipposlam_states,
-                                                    save_hipposlam_pth=save_hipposlam_pth)
+class StateMapLearnerUmapSnodes(StateMapLearnerUmapEmbedding):
+    def __init__(self, R=5, L=20, maxt=1000, max_hipposlam_states=1000,
+                 save_hipposlam_pth=None, save_trajdata_pth=None):
+        super(StateMapLearnerUmapSnodes, self).__init__(R, L, maxt, max_hipposlam_states,
+                                                    save_hipposlam_pth=save_hipposlam_pth,
+                                                        save_trajdata_pth=save_trajdata_pth)
         self.obs_dim = max_hipposlam_states
         lowBox = np.zeros(self.obs_dim).astype(np.float32)
         highBox = np.ones(self.obs_dim).astype(np.float32)
         self.observation_space = gym.spaces.Box(lowBox, highBox, shape=(self.obs_dim,))
+        self.hippomap.area_norm = True
+
 
     def get_obs(self):
         sid, Snodes = self.get_obs_base()

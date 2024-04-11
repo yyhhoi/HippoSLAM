@@ -132,16 +132,16 @@ class MatrixJ:
             norm = np.sum(self.mat[sid, :, :])
         else:
             norm = np.sqrt(np.sum(self.mat[sid, :, :] ** 2))
-            if norm == 0:
-                norm = 1
+        if norm == 0:
+            norm = 1
         self.mat[sid, :, :] = self.mat[sid, :, :] / norm
 
-    def normalize_slice_cuetypes(self, sid, far_ids):
+    def normalize_slice_cuetypes(self, sid, far_ids, area=False):
         N, F, K = self.mat.shape
         assert N > 0
         assert F > 0
         if far_ids is None:
-            self.normalize_slice(sid, area=False)
+            self.normalize_slice(sid, area=area)
         else:
             allFids = set(i for i in range(F))
             close_ids = list(allFids.difference(far_ids))
@@ -156,7 +156,7 @@ class MatrixJ:
 
 
 class StateDecoder:
-    def __init__(self, R, L, maxN=500, lr=1):
+    def __init__(self, R, L, maxN=500, lr=1, area_norm=False):
         self.R = R
         self.K = R + L - 1  # Number of columns of decoder matrix J
         self.N = 0  # Number of state nodes
@@ -170,12 +170,20 @@ class StateDecoder:
                          self.K)  # MatrixJ mapping J.reshape(N, -1) @ X.flatten() = State vector
         self.lr = lr
 
+        self.area_norm = area_norm
+
 
         # Embedding
         self.sid2embed = []
 
     def set_lowSthresh(self, s):
         self.lowSThresh = s
+    @property
+    def area_norm(self):
+        return self._area_norm
+    @area_norm.setter
+    def area_norm(self, value: bool):
+        self._area_norm = value
 
 
     def learn_embedding(self, X, e_new, emins, emaxs, far_ids):
@@ -238,7 +246,7 @@ class StateDecoder:
             sid = self.N - 1
         # Increment to the specified sid (supervised)
         self.J.increment(X * self.lr, sid)
-        self.J.normalize_slice_cuetypes(sid, far_ids)
+        self.J.normalize_slice_cuetypes(sid, far_ids, self._area_norm)
         return sid
 
     def learn_unsupervised(self, X):
