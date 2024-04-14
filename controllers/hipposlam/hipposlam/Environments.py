@@ -9,7 +9,6 @@ import torch
 from skimage.io import imsave
 from sklearn.decomposition import IncrementalPCA
 from stable_baselines3.common.callbacks import CheckpointCallback
-from umap.parametric_umap import load_ParametricUMAP
 from controller import Supervisor
 import gymnasium as gym
 
@@ -292,10 +291,10 @@ class Forest(Supervisor, gym.Env):
         self.rotz, self.rota = None, None
         self.stuck_m = 0
         self.stuck_epsilon = 0.001
-        self.stuck_thresh = 8.5
+        self.stuck_thresh = 8
         self.fallen = False
         self.fallen_seq = 0
-        self.fallen_thresh = 1
+        self.fallen_thresh = 0.6
 
         # Wheels
         self.leftMotor1 = self.getDevice('wheel1')
@@ -493,12 +492,6 @@ class ImageSampler(Forest):
         self.cam_width = self.cam.getWidth()
         self.cam_height = self.cam.getHeight()
 
-        self.stuck_m = 0
-        self.stuck_epsilon = 0.001
-        self.stuck_thresh = 8
-        self.fallen = False
-        self.fallen_seq = 0
-        self.fallen_thresh = 0.6
 
         self.translation_field.enableSFTracking(int(self.getBasicTimeStep()))
         self.rotation_field.enableSFTracking(int(self.getBasicTimeStep()))
@@ -508,11 +501,6 @@ class ImageSampler(Forest):
         os.makedirs(self.save_img_dir, exist_ok=True)
         self.save_annotation_pth = r'data\VAE\annotations3.csv'
         self.c = 0
-        # self.sim = 0  # 1 if the state is similar to the previous sample, 0 if not
-        # self.x_prev, self.y_prev, _ = self._get_translation()
-        # self.a_prev = self._get_rotation()
-        # self.dist_thresh = 2
-        # self.adiff_thresh = np.pi / 6
         if not os.path.exists(self.save_annotation_pth):
             with open(self.save_annotation_pth, 'w') as f:
                 f.write('c,t,x,y,a\n')
@@ -540,14 +528,6 @@ class ImageSampler(Forest):
 
         return 0
 
-
-# class OmniscientLearner(Forest):
-#     def __init__(self, max_episode_steps=1000, use_ds=True,  spawn='all'):
-#         super(OmniscientLearner, self).__init__(max_episode_steps, use_ds, spawn)
-#         lowBox = np.array([-16.5, -8.7, -1, -1, -1, -1], dtype=np.float32)
-#         highBox = np.array([8.7,  17,  1,  1, 1, 1], dtype=np.float32)
-#         self.obs_dim = 6
-#         self.observation_space = gym.spaces.Box(lowBox, highBox, shape=(self.obs_dim,))
 
 
 class EmbeddingLearner(Forest):
@@ -577,10 +557,13 @@ class EmbeddingLearner(Forest):
 
 
 class StateMapLearner(Forest):
-    def __init__(self, R=5, L=10, maxt=1000, max_hipposlam_states=500,
-                 save_hipposlam_pth=None, save_trajdata_pth=None):
+    def __init__(self, R=5, L=20, maxt=1000, max_hipposlam_states=500,
+                 save_hipposlam_pth=None, save_trajdata_pth=None, save_img_dir=None):
         super(StateMapLearner, self).__init__(maxt)
         self.observation_space = gym.spaces.Discrete(max_hipposlam_states)
+        self.save_trajdata_pth = save_trajdata_pth
+        self.save_img_dir = save_img_dir
+        self.c = 0  # global counter for image saving
 
         # Camera
         self.camera_timestep = int(self.getBasicTimeStep())
@@ -597,7 +580,6 @@ class StateMapLearner(Forest):
         self.hipposeq = Sequences(R=R, L=L, reobserve=False)
         self.hippomap = StateDecoder(R=R, L=L, maxN=max_hipposlam_states, area_norm=False)
         self.hippomap.set_lowSthresh(0.2)
-        self.save_trajdata_pth = save_trajdata_pth
         self.current_embedid = 0
 
         # I/O
@@ -609,10 +591,15 @@ class StateMapLearner(Forest):
     def get_obs_base(self):
         id_list = self.recognize_objects()
         self.hipposeq.step(id_list)
-        sid, Snodes = self.hippomap.infer_state(self.hipposeq.X)
-        if (self.hippomap.reach_maximum() is False) and (self.hippomap.learn_mode):
-            self.hippomap.learn_unsupervised(self.hipposeq.X)
-        # print('Interred state = %d   / %d  , val = %0.2f. F = %d, Xsum=%0.4f'%(sid+1, self.hippomap.N, Snodes[sid], self.hippomap.current_F, self.hipposeq.X.sum()))
+
+        if (self.t % 5) == 0:
+            self.save_image(join(self.save_img_dir, f'{self.c}_{self.t}.png'))
+            self.c += 1
+        # sid, Snodes = self.hippomap.infer_state(self.hipposeq.X)
+        # if (self.hippomap.reach_maximum() is False) and (self.hippomap.learn_mode):
+        #     self.hippomap.learn_unsupervised(self.hipposeq.X)
+        sid = 0
+        Snodes = np.array([0])
         return sid, Snodes
 
     def get_obs(self):
@@ -720,6 +707,13 @@ class StateMapLearner(Forest):
         if 'fpos' in hippodata:
             self.fpos_dict = hippodata['fpos']
         return hippodata
+
+    def save_image(self, save_img_pth):
+        img_bytes = self.cam.getImage()
+        img = np.array(bytearray(img_bytes)).reshape(self.cam_height, self.cam_width, 4)  # BGRA
+        img = img[:, :, [2, 1, 0, 3]]  # RGBA
+        imsave(save_img_pth, img)
+
 
 
 class StateMapLearnerVAEEmbedding(StateMapLearner):

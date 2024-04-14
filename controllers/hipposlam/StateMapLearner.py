@@ -127,8 +127,20 @@ def SB_PPO_Train_Embedding():
 
 
 def ImageSampling():
+    base_dir = r'D:'
+    project_tag = 'ImageSamplingHippoSeq'
+    project_dir = join(base_dir, 'data', project_tag)
+    save_hipposlam_pth = join(project_dir, 'hipposlam.pickle')
+    save_trajdata_pth = join(project_dir, 'trajdata.pickle')
+    save_img_dir = join(project_dir, 'imgs')
+    os.makedirs(project_dir, exist_ok=True)
+    os.makedirs(save_img_dir, exist_ok=True)
 
-    env = ImageSampler()
+    env = StateMapLearner(R=5, L=20, maxt=1000, max_hipposlam_states=500,
+                 save_hipposlam_pth=save_hipposlam_pth, save_trajdata_pth=save_trajdata_pth, save_img_dir=save_img_dir)
+
+
+
     max_img_num = 10000
     env.c = 0
     while env.c < max_img_num:
@@ -527,8 +539,8 @@ def main():
     # naive_avoidance()
     # evaluate_trained_model()
     # fine_tune_trained_model()
-    SB_PPO_Train()
-    # ImageSampling()
+    # SB_PPO_Train()
+    ImageSampling()
     # SB_PPO_Eval()
     # SB_PPO_Train_Embedding()
     return None
