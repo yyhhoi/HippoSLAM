@@ -10,7 +10,7 @@ from os.path import join
 import numpy as np
 import torch
 import umap
-from hipposlam.VAE import get_dataloaders, VAELearner, ContrastiveVAELearner
+from hipposlam.Embeddings import get_dataloaders, VAELearner, ContrastiveVAELearner
 from sklearn.decomposition import PCA
 
 def loop_and_plot_umap(embeds, xya, ax3txtext, save_plot_dir):

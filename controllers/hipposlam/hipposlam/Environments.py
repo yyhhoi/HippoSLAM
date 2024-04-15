@@ -15,7 +15,7 @@ import gymnasium as gym
 from .Sequences import Sequences, StateDecoder, StateTeacher
 from .utils import save_pickle, read_pickle, Recorder
 from .vision import WebotImageConvertor, MobileNetEmbedder
-from .VAE import VAELearner, ContrastiveVAELearner
+from .Embeddings import VAELearner, ContrastiveVAELearner
 
 
 class BreakRoom(Supervisor, gym.Env):

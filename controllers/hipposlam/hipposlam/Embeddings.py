@@ -12,12 +12,25 @@ import pandas as pd
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, random_split
+from umap.parametric_umap import ParametricUMAP, load_ParametricUMAP
+
 from torchvision.io import read_image
 from .DataLoaders import WebotsImageDataset, EmbeddingImageDataset, EmbeddingImageDatasetAll, \
     LocalContrastiveEmbeddingDataloader, ContrastiveEmbeddingDataloader
 import logging
 from glob import glob
 
+def save_parametric_umap_model(umap_model, save_umap_dir, umins, umaxs):
+    umap_model.save(save_umap_dir)
+    torch.save(umins, join(save_umap_dir, 'umins.pt'))
+    torch.save(umaxs, join(save_umap_dir, 'umaxs.pt'))
+
+def load_parametric_umap_model(load_umap_dir):
+    # Load umap model (previously trained)
+    umap_model = load_ParametricUMAP(load_umap_dir)
+    umins = torch.load(join(load_umap_dir, 'umins.pt'))
+    umaxs = torch.load(join(load_umap_dir, 'umaxs.pt'))
+    return umap_model, umins, umaxs
 
 def convert_to_embed(load_img_dir, load_annotation_pth, save_embed_dir, all=True):
     """

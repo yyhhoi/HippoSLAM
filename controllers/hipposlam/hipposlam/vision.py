@@ -4,6 +4,7 @@ import torch
 from torchvision import models
 
 import cv2 as cv
+from torchvision.io import read_image
 
 
 class SiftMemory:
@@ -114,7 +115,7 @@ class WebotImageConvertor:
         Returns
         -------
         Image array : torch.Tensor
-            Shape = (RGB, height, width). dtype=torch.float32
+            Shape = (RGB, height, width). dtype=torch.float32. Value range = [0.0, 1.0]
 
         """
         out = torch.tensor(bytearray(imagebytes)).reshape((self.height, self.width, 4))  # BGRA, torch.uint8
@@ -135,7 +136,8 @@ class MobileNetEmbedder:
         Parameters
         ----------
         img_tensor : torch.Tensor
-            (3, 256, 256) or (N, 3, 256, 256). dtype=torch.float32. Value range=[0.0, 1.0]. RGB channels.
+            (3, 256, 256) or (N, 3, 256, 256). RGB channels. Either float or integers.
+            dtype=torch.float32. Value range=[0.0, 1.0]. OR dtype=torch.uint8. Value range=[0, 1, ..., 255].
 
         Returns
         -------
@@ -155,13 +157,17 @@ class MobileNetEmbedder:
             embedding = torch.flatten(x)
         return embedding
 
-    def infer_embedding_from_path(self, img_path):
-        pass
+    def infer_embedding_from_path(self, load_img_pth):
+        img_tensor = read_image(load_img_pth)[:3, ...]
+        embedding = self.infer_embedding(img_tensor)
+        return embedding
 
 
     def _get_model(self):
         weights = models.MobileNet_V3_Small_Weights.IMAGENET1K_V1
         model = models.mobilenet_v3_small(weights=weights)
         model.eval()
+        # See https://pytorch.org/vision/main/models/generated/torchvision.models.mobilenet_v3_small.html#torchvision.models.mobilenet_v3_small
+        # for details of the preprocessing pipelines
         preprocess = weights.transforms()
         return model, preprocess
