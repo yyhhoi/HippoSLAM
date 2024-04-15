@@ -584,7 +584,7 @@ class StateMapLearner(Forest):
 
         # I/O
         if self.save_trajdata_pth:
-            self.SW = Recorder('t', 'x', 'y', 'a', 'sid', 'r', 'terminated', 'truncated', 'fsigma', 'embedid')
+            self.SW = Recorder('t', 'x', 'y', 'a', 'sid', 'r', 'terminated', 'truncated', 'fsigma', 'c')
         else:
             self.SW = None
 
@@ -592,14 +592,10 @@ class StateMapLearner(Forest):
         id_list = self.recognize_objects()
         self.hipposeq.step(id_list)
 
-        if (self.t % 5) == 0:
-            self.save_image(join(self.save_img_dir, f'{self.c}_{self.t}.png'))
-            self.c += 1
-        # sid, Snodes = self.hippomap.infer_state(self.hipposeq.X)
-        # if (self.hippomap.reach_maximum() is False) and (self.hippomap.learn_mode):
-        #     self.hippomap.learn_unsupervised(self.hipposeq.X)
-        sid = 0
-        Snodes = np.array([0])
+        sid, Snodes = self.hippomap.infer_state(self.hipposeq.X)
+        if (self.hippomap.reach_maximum() is False) and (self.hippomap.learn_mode):
+            self.hippomap.learn_unsupervised(self.hipposeq.X)
+
         return sid, Snodes
 
     def get_obs(self):
@@ -714,6 +710,46 @@ class StateMapLearner(Forest):
         img = img[:, :, [2, 1, 0, 3]]  # RGBA
         imsave(save_img_pth, img)
 
+
+class StateMapLearnerImageSaver(StateMapLearner):
+
+    def __init__(self, R=5, L=20, maxt=1000, max_hipposlam_states=500,
+                 save_hipposlam_pth=None, save_trajdata_pth=None, save_img_dir=None):
+        super().__init__(R=R, L=L, maxt=maxt, max_hipposlam_states=max_hipposlam_states,
+                         save_hipposlam_pth=save_hipposlam_pth, save_trajdata_pth=save_trajdata_pth,
+                         save_img_dir=save_img_dir)
+
+        # I/O
+        if self.save_trajdata_pth:
+            self.SW = Recorder('t', 'x', 'y', 'a', 'fsigma', 'c')
+        else:
+            self.SW = None
+
+
+    def get_obs_base(self):
+        id_list = self.recognize_objects()
+        self.hipposeq.step(id_list)
+
+
+        if self.save_trajdata_pth:
+            x, y, _ = super()._get_translation()
+            a = super()._get_heading()
+            fsigma_to_store = copy.deepcopy({key: val for key, val in self.hipposeq.f_sigma.items() if len(val) > 0})
+            self.SW.record(t=self.t, x=x, y=y, a=a, fsigma=fsigma_to_store, c=self.c)
+
+        if (self.t % 5) == 0:
+            self.save_image(join(self.save_img_dir, f'{self.c}_{self.t}.png'))
+            self.c += 1
+
+        sid = 0
+        Snodes = np.array([0])
+        return sid, Snodes
+
+    def step(self, action):
+        obs, reward, terminated, truncated, info = super(StateMapLearner, self).step(action)
+        info['Nstates'] = self.hippomap.N
+
+        return obs, reward, terminated, truncated, info
 
 
 class StateMapLearnerVAEEmbedding(StateMapLearner):

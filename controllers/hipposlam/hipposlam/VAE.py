@@ -18,6 +18,7 @@ from .DataLoaders import WebotsImageDataset, EmbeddingImageDataset, EmbeddingIma
 import logging
 from glob import glob
 
+
 def convert_to_embed(load_img_dir, load_annotation_pth, save_embed_dir, all=True):
     """
     Run MobileNet V3 Small to convert images to embeddings, and save.

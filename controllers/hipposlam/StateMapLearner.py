@@ -15,7 +15,8 @@ from hipposlam.Networks import MLP
 # from hipposlam.ReinforcementLearning import AWAC, A2C, compute_discounted_returns
 from hipposlam.Replay import ReplayMemoryAWAC, ReplayMemoryA2C
 from hipposlam.utils import breakroom_avoidance_policy, save_pickle, Recorder, read_pickle
-from hipposlam.Environments import StateMapLearner, StateMapLearnerTaught, EmbeddingLearner, StateMapLearnerUmapEmbedding
+from hipposlam.Environments import StateMapLearner, StateMapLearnerTaught, EmbeddingLearner, \
+    StateMapLearnerUmapEmbedding, StateMapLearnerImageSaver
 from hipposlam.Environments import ImageSampler, StateMapLearnerVAEEmbedding, StateMapLearnerUmapSnodes
 from os.path import join
 import os
@@ -136,7 +137,7 @@ def ImageSampling():
     os.makedirs(project_dir, exist_ok=True)
     os.makedirs(save_img_dir, exist_ok=True)
 
-    env = StateMapLearner(R=5, L=20, maxt=1000, max_hipposlam_states=500,
+    env = StateMapLearnerImageSaver(R=5, L=20, maxt=1000, max_hipposlam_states=500,
                  save_hipposlam_pth=save_hipposlam_pth, save_trajdata_pth=save_trajdata_pth, save_img_dir=save_img_dir)
 
 
