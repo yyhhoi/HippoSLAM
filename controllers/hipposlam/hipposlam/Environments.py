@@ -9,6 +9,8 @@ import torch
 from skimage.io import imsave
 from sklearn.decomposition import IncrementalPCA
 from stable_baselines3.common.callbacks import CheckpointCallback
+from umap.parametric_umap import load_ParametricUMAP
+
 from controller import Supervisor
 import gymnasium as gym
 
@@ -721,7 +723,7 @@ class StateMapLearnerImageSaver(StateMapLearner):
 
         # I/O
         if self.save_trajdata_pth:
-            self.SW = Recorder('t', 'x', 'y', 'a', 'fsigma', 'c')
+            self.SW = Recorder('t', 'x', 'y', 'a', 'id_list', 'c')
         else:
             self.SW = None
 
@@ -735,7 +737,7 @@ class StateMapLearnerImageSaver(StateMapLearner):
             x, y, _ = super()._get_translation()
             a = super()._get_heading()
             fsigma_to_store = copy.deepcopy({key: val for key, val in self.hipposeq.f_sigma.items() if len(val) > 0})
-            self.SW.record(t=self.t, x=x, y=y, a=a, fsigma=fsigma_to_store, c=self.c)
+            self.SW.record(t=self.t, x=x, y=y, a=a, id_list=id_list, c=self.c)
 
         if (self.t % 5) == 0:
             self.save_image(join(self.save_img_dir, f'{self.c}_{self.t}.png'))

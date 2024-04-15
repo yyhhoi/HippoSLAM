@@ -187,6 +187,26 @@ class StateDecoder:
 
 
     def learn_embedding(self, X, e_new, emins, emaxs, far_ids):
+        """
+
+        Parameters
+        ----------
+        X : ndarray
+            Shape = (F, K). From Sequence.X
+        e_new : ndarray
+            Shape = (Embed_dim, )
+        emins : ndarray
+            Shape = (Embed_dim, )
+        emaxs : ndarray
+            Shape = (Embed_dim, )
+        far_ids : None or list
+
+        Returns
+        -------
+        index of the embedding vector in the storage, i.e. self.sid2embed
+        """
+
+
         assert self.N == len(self.sid2embed)
 
         # print('Far ids = \n', far_ids)
@@ -199,9 +219,6 @@ class StateDecoder:
 
 
         e_mat = np.stack(self.sid2embed)  # -> (Nstates, Embed_dim)
-
-        # Cosine similarity. (Embed_dim, ) @ (Nstates, Embed_dim).T -> (Nstates, )
-        # cossim = e_new @ (e_mat.T) / (np.linalg.norm(e_new) * np.linalg.norm(e_mat, axis=1) + 1e-9)
         e_new_norm = (e_new - emins) / (emaxs - emins)
         e_mat_norm = (e_mat - emins) / (emaxs - emins)
         sim_measure = 1 - np.sqrt(np.sum(np.square(e_new_norm.reshape(1, -1) - e_mat_norm), axis=1)) / np.sqrt(2)
