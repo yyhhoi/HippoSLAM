@@ -8,6 +8,7 @@ from umap.parametric_umap import ParametricUMAP
 from tqdm import tqdm
 from .Embeddings import save_parametric_umap_model, load_parametric_umap_model
 from .utils import read_pickle, save_pickle
+from .vis import plot_spatial_specificity, compare_spatial_specificity
 from .vision import MobileNetEmbedder
 
 from .Sequences import Sequences, StateDecoder
@@ -45,7 +46,7 @@ def preprocess_trajdata(assets_dir, load_trajdata_pth):
         trajdf.pickle
     """
 
-    keys = ['x', 'y', 'a', 't', 'fsigma', 'c']
+    keys = ['x', 'y', 'a', 't', 'id_list', 'c']
     data_dict = {key: [] for key in keys}
     trajdata = read_pickle(load_trajdata_pth)  # list of dicts. The key in the dict contains a list of data.
     for i in range(len(trajdata)):
@@ -145,7 +146,7 @@ def convert_embeddings_mobilenet_to_umap(load_embeds_pth, load_annotations_pth, 
     print('Umap embeds maxs\n', umaxs)
 
     # Save Umap
-    save_parametric_umap_model(save_umap_dir, umins, umaxs)
+    save_parametric_umap_model(umap_model, save_umap_dir, umins, umaxs)
     torch.save(umap_embeds, join(save_umap_dir, 'umap_embeddings.pt'))
 
     # Load Annotation
@@ -197,7 +198,7 @@ def plot_umap_embeddings_2d(umap_embeds, ann_df, nneigh, min_dist, metric):
     fig.tight_layout()
     return fig, ax
 
-def statemap_learn(load_trajdf_pth, load_embedsIndex_pth, load_umapEmbeds_pth, load_umap_dir):
+def statemap_learn(assets_dir, load_trajdf_pth, load_embedsIndex_pth, load_umapEmbeds_pth, load_umap_dir):
     """
     Load:
         trajdf.pickle
@@ -206,8 +207,6 @@ def statemap_learn(load_trajdf_pth, load_embedsIndex_pth, load_umapEmbeds_pth, l
         load_umap_dir/umins.pt
         load_umap_dir/umaxs.pt
 
-
-
     """
     # Parameters
     R, L = 5, 20
@@ -215,24 +214,77 @@ def statemap_learn(load_trajdf_pth, load_embedsIndex_pth, load_umapEmbeds_pth, l
     # Load data
     trajdf = read_pickle(load_trajdf_pth)
     embeds_index = read_pickle(load_embedsIndex_pth)
-    umap_embeddings = torch.load(load_umapEmbeds_pth).numpy()
-    umins = torch.load(join(load_umap_dir, 'umins.pt')).numpy()
-    umaxs = torch.load(join(load_umap_dir, 'umaxs.pt')).numpy()
+    umap_embeddings = torch.load(load_umapEmbeds_pth)
+    umins = torch.load(join(load_umap_dir, 'umins.pt'))
+    umaxs = torch.load(join(load_umap_dir, 'umaxs.pt'))
 
 
     # Initialize hipposlam
     hipposeq = Sequences(R=R, L=L, reobserve=False)
-    hippomap = StateDecoder(R=R, L=L, maxN=1000, area_norm=False)
+    hippomap = StateDecoder(R=R, L=L, maxN=1000, area_norm=True)
+    hippomap.set_lowSthresh(0.98)
 
+    # Prepare for storage
+    df_cols = ['pred_sid', 'targ_sid', 'img_name', 'img_exist', 'x', 'y', 'a']
+    df_dict = {key:[] for key in df_cols}
+
+    # Infer the state
     for i in tqdm(range(trajdf.shape[0])):
-        id_list = trajdf.loc[i, 'id_list']
+        id_list, x, y, a, img_name, img_exist = trajdf.loc[i, ['id_list', 'x', 'y', 'a', 'img_name', 'img_exist']]
 
         hipposeq.step(id_list)
-        sid, Snodes = hippomap.infer_state(hipposeq.X)
 
         if (i in embeds_index) and (hippomap.current_F > 0):
             umap_embed = umap_embeddings[embeds_index[i], :]  # -> (2, )
 
             current_embedid = hippomap.learn_embedding(hipposeq.X, umap_embed, umins, umaxs,
                                                                  far_ids=None)
+            df_dict['targ_sid'].append(current_embedid)
+        else:
+            df_dict['targ_sid'].append(-1)
+
+        sid, Snodes = hippomap.infer_state(hipposeq.X)
+
+        df_dict['pred_sid'].append(sid)
+        df_dict['x'].append(x)
+        df_dict['y'].append(y)
+        df_dict['a'].append(a)
+        df_dict['img_name'].append(img_name)
+        df_dict['img_exist'].append(img_exist)
+
+    df = pd.DataFrame(df_dict)
+    df.to_csv(join(assets_dir, 'simdf.csv'))
+
+
+def analyze_state_specificity(assets_dir, load_simdf_pth):
+    save_dir = join(assets_dir, 'state_specificity')
+    os.makedirs(save_dir, exist_ok=True)
+
+
+    simdf = pd.read_csv(load_simdf_pth)
+
+    simdf['offset'] = simdf['img_name'].apply(lambda x: int(x.split('.')[0].split('_')[1])) % 5
+    embeddf = simdf[simdf['img_exist']]
+    embedids = embeddf['targ_sid'].to_numpy()
+    predsids = simdf['pred_sid'].to_numpy()
+    unique_embedids = np.unique(embedids)
+
+    print(f'Num unique states = {unique_embedids.shape[0]}')
+    aedges = np.linspace(-np.pi, np.pi, 16)
+
+    xbound = (-18, 8)
+    ybound = (-8, 18)
+
+    for i, embedid_each in enumerate(tqdm(unique_embedids)):
+        subdf = embeddf[embeddf['targ_sid'] == embedid_each]
+        xya_targs = subdf[['x', 'y', 'a']].to_numpy()
+        subsimdf = simdf[simdf['pred_sid'] == embedid_each]
+        xya_pred = subsimdf[['x', 'y', 'a']].to_numpy()
+        pred_offsets = subsimdf['offset'].to_numpy()
+        title = f'embedid={embedid_each}, num={xya_pred.shape[0]}'
+        fig, _ = compare_spatial_specificity(xya_targs, xya_pred, pred_offsets, aedges, xbound, ybound, title=title)
+
+        fig.savefig(join(save_dir, '%d.png'%(i)), dpi=200)
+        plt.close(fig)
+
 

@@ -186,7 +186,7 @@ class StateDecoder:
         self._area_norm = value
 
 
-    def learn_embedding(self, X, e_new, emins, emaxs, far_ids):
+    def learn_embedding(self, X, e_new, emins, emaxs, far_ids, verbose=False):
         """
 
         Parameters
@@ -200,13 +200,14 @@ class StateDecoder:
         emaxs : ndarray
             Shape = (Embed_dim, )
         far_ids : None or list
+        verbose : bool
 
         Returns
         -------
         index of the embedding vector in the storage, i.e. self.sid2embed
         """
 
-
+        self.update_F(X)
         assert self.N == len(self.sid2embed)
 
         # print('Far ids = \n', far_ids)
@@ -225,22 +226,25 @@ class StateDecoder:
 
         maxid = np.argmax(sim_measure)
         maxsimval = sim_measure[maxid]
-
-        print('maxsimval = ', maxsimval)
+        if verbose:
+            print('maxsimval = ', maxsimval)
 
         if (maxsimval < self.lowSThresh) and (not self.reach_maximum()):  # Not matching any existing embeddings
             # Create a new state, and remember the embedding
             _ = self.learn_supervised(X, sid=None, far_ids=far_ids)
             self.sid2embed.append(e_new.copy())
-            print(f'Learn new state = {self.N-1}')
+            if verbose:
+                print(f'Learn new state = {self.N-1}')
 
         else:
             if maxid != self.current_Sid:
-                print(f'Learn old state = {self.current_Sid} to {maxid}')
+                msg = 'Learn old state = '
             else:
-                print(f'Correct state prediction {self.current_Sid} to {maxid}')
+                msg = 'Correct state prediction'
             _ = self.learn_supervised(X, sid=maxid, far_ids=far_ids)
 
+            if verbose:
+                print(f'{msg} {self.current_Sid} to {maxid}')
 
         return maxid
 
