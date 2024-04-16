@@ -1,4 +1,6 @@
 import numpy as np
+
+from .Embeddings import measure_umap_similarity
 from .circ import cdiff
 from scipy.signal import convolve
 from collections import OrderedDict
@@ -219,12 +221,8 @@ class StateDecoder:
             return 0
 
 
-        e_mat = np.stack(self.sid2embed)  # -> (Nstates, Embed_dim)
-        e_new_norm = (e_new - emins) / (emaxs - emins)
-        e_mat_norm = (e_mat - emins) / (emaxs - emins)
-        sim_measure = 1 - np.sqrt(np.sum(np.square(e_new_norm.reshape(1, -1) - e_mat_norm), axis=1)) / np.sqrt(2)
-
-        maxid = np.argmax(sim_measure)
+        e_mat = np.stack(self.sid2embed)
+        maxid, sim_measure = measure_umap_similarity(e_new, e_mat, emins, emaxs)
         maxsimval = sim_measure[maxid]
         if verbose:
             print('maxsimval = ', maxsimval)
@@ -247,6 +245,26 @@ class StateDecoder:
                 print(f'{msg} {self.current_Sid} to {maxid}')
 
         return maxid
+
+    def simple_umap_state_assignment(self, e_new, emins, emaxs):
+
+        # Initial condition
+        if len(self.sid2embed) == 0:
+            self.sid2embed.append(e_new.copy())
+            return 0, [1]
+
+
+        e_mat = np.stack(self.sid2embed)
+        maxid, sim_measure = measure_umap_similarity(e_new, e_mat, emins, emaxs)
+
+
+        if (sim_measure[maxid] < self.lowSThresh) and (not self.reach_maximum()):  # Not matching any existing embeddings
+            # Create a new state, and remember the embedding
+            self.sid2embed.append(e_new.copy())
+            maxid = len(self.sid2embed) - 1
+            sim_measure = np.append(sim_measure, 1)
+
+        return maxid, sim_measure
 
     def learn_supervised(self, X, sid=None, far_ids=None):
         """

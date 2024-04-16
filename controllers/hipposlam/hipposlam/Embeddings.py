@@ -32,6 +32,33 @@ def load_parametric_umap_model(load_umap_dir):
     umaxs = torch.load(join(load_umap_dir, 'umaxs.pt'))
     return umap_model, umins, umaxs
 
+def measure_umap_similarity(unew, umat, umins, umaxs):
+    '''
+
+    Parameters
+    ----------
+    unew : ndarray
+        Shape= (Embeds_dim, ). float32.
+    umat : ndarray
+        Shape= (N, Embeds_dim). float32.
+    umins : ndarray
+        Shape= (Embeds_dim, ). float32.
+    umaxs : ndarray
+        Shape= (Embeds_dim, ). float32.
+
+    Returns
+    -------
+
+    '''
+
+    unew_norm = (unew - umins) / (umaxs - umins)
+    umat_norm = (umat - umins) / (umaxs - umins)
+    sim_measure = 1 - np.sqrt(np.sum(np.square(unew_norm.reshape(1, -1) - umat_norm), axis=1)) / np.sqrt(2)
+
+    maxid = np.argmax(sim_measure)
+    return maxid, sim_measure
+
+
 def convert_to_embed(load_img_dir, load_annotation_pth, save_embed_dir, all=True):
     """
     Run MobileNet V3 Small to convert images to embeddings, and save.

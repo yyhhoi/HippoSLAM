@@ -30,16 +30,16 @@ os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 def SB_PPO_Train():
     # Modes
-    load_model = True
+    load_model = False
     save_model = True
     hippomap_learn = True
     model_class = PPO
 
     # Paths
-    save_dir = join('data', 'StateMapLearnerVAEEmbedding')
+    save_dir = join('data', 'SimpleUmapLearner')
     os.makedirs(save_dir, exist_ok=True)
-    load_model_name = 'PPO7'
-    save_model_name = 'PPO8'
+    load_model_name = ''
+    save_model_name = 'PPO1'
     load_hipposlam_pth = join(save_dir, '%s_hipposlam.pickle' % load_model_name)
     load_model_pth = join(save_dir, '%s.zip'%(load_model_name))
     save_hipposlam_pth = join(save_dir, '%s_hipposlam.pickle' % save_model_name)
@@ -49,10 +49,10 @@ def SB_PPO_Train():
     # save_trajdata_pth = None
 
     # Environment
-    # env = StateMapLearnerUmapEmbedding(R=5, L=20, max_hipposlam_states=1000,
-    #                                  save_hipposlam_pth=save_hipposlam_pth, save_trajdata_pth=save_trajdata_pth)
-    env = StateMapLearnerVAEEmbedding(R=5, L=20, max_hipposlam_states=1000,
+    env = StateMapLearnerUmapEmbedding(R=5, L=20, max_hipposlam_states=1000,
                                      save_hipposlam_pth=save_hipposlam_pth, save_trajdata_pth=save_trajdata_pth)
+    # env = StateMapLearnerVAEEmbedding(R=5, L=20, max_hipposlam_states=1000,
+    #                                  save_hipposlam_pth=save_hipposlam_pth, save_trajdata_pth=save_trajdata_pth)
     # env = StateMapLearnerTaught(R=5, L=20,
     #                                  save_hipposlam_pth=save_hipposlam_pth, save_trajdata_pth=save_trajdata_pth)
     # env = StateMapLearnerUmapSnodes(R=5, L=20, max_hipposlam_states=1000,
@@ -540,8 +540,8 @@ def main():
     # naive_avoidance()
     # evaluate_trained_model()
     # fine_tune_trained_model()
-    # SB_PPO_Train()
-    ImageSampling()
+    SB_PPO_Train()
+    # ImageSampling()
     # SB_PPO_Eval()
     # SB_PPO_Train_Embedding()
     return None

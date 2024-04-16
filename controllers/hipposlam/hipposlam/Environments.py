@@ -9,7 +9,6 @@ import torch
 from skimage.io import imsave
 from sklearn.decomposition import IncrementalPCA
 from stable_baselines3.common.callbacks import CheckpointCallback
-from umap.parametric_umap import load_ParametricUMAP
 
 from controller import Supervisor
 import gymnasium as gym
@@ -17,7 +16,7 @@ import gymnasium as gym
 from .Sequences import Sequences, StateDecoder, StateTeacher
 from .utils import save_pickle, read_pickle, Recorder
 from .vision import WebotImageConvertor, MobileNetEmbedder
-from .Embeddings import VAELearner, ContrastiveVAELearner
+from .Embeddings import VAELearner, ContrastiveVAELearner, load_parametric_umap_model
 
 
 class BreakRoom(Supervisor, gym.Env):
@@ -586,7 +585,7 @@ class StateMapLearner(Forest):
 
         # I/O
         if self.save_trajdata_pth:
-            self.SW = Recorder('t', 'x', 'y', 'a', 'sid', 'r', 'terminated', 'truncated', 'fsigma', 'c')
+            self.SW = Recorder('t', 'x', 'y', 'a', 'sid', 'r', 'terminated', 'truncated', 'fsigma', 'embedid')
         else:
             self.SW = None
 
@@ -824,25 +823,33 @@ class StateMapLearnerUmapEmbedding(StateMapLearner):
         self.imgembedder = MobileNetEmbedder()
         self.hippomap.set_lowSthresh(0.98)
         print('Loading Umap')
-        self.umap_model = load_ParametricUMAP('data/VAE/model/OnlyEmbed_imgs3/umap_param')
-        self.umins = np.array([-17.670673, -16.776457])
-        self.umaxs = np.array([12.743417, 12.321048])
+        load_umap_dir = r'D:\data\OfflineStateMapLearner_IdList3\base\assets\umap_params'
+        self.umap_model, self.umins, self.umaxs = load_parametric_umap_model(load_umap_dir)
         self.embedding_buffer = []
+
     def get_obs_base(self):
-        id_list = self.recognize_objects()
-        self.hipposeq.step(id_list)
-        sid, Snodes = self.hippomap.infer_state(self.hipposeq.X)
+        img_bytes = self.cam.getImage()
+        img_tensor = self.imgconverter.to_torch_RGB(img_bytes)
+        embedding = self.imgembedder.infer_embedding(img_tensor)
+        umap_embed = self.umap_model.transform(embedding.unsqueeze(0).numpy()).squeeze()
+        sid, Snodes = self.hippomap.simple_umap_state_assignment(
+            umap_embed, self.umins, self.umaxs)
+        print('sid = %d, sval = %0.4f'%(sid, Snodes[sid]))
 
-        # Image embedding
-        if (self.hippomap.learn_mode) and (self.t % 5 == 0) and (self.hippomap.current_F > 0):
-            # far_ids = list(self.hipposeq.far_fids.values())
-            img_bytes = self.cam.getImage()
-            img_tensor = self.imgconverter.to_torch_RGB(img_bytes)
-            embedding = self.imgembedder.infer_embedding(img_tensor)
-            umap_embed = self.umap_model.transform(embedding.unsqueeze(0).numpy()).squeeze()
-
-            self.current_embedid = self.hippomap.learn_embedding(self.hipposeq.X, umap_embed, self.umins, self.umaxs,
-                                                                 far_ids=None)
+        self.current_embedid = sid
+        # id_list = self.recognize_objects()
+        # self.hipposeq.step(id_list)
+        # sid, Snodes = self.hippomap.infer_state(self.hipposeq.X)
+        #
+        # # Image embedding
+        # if (self.hippomap.learn_mode) and (self.t % 5 == 0) and (self.hippomap.current_F > 0):
+        #     img_bytes = self.cam.getImage()
+        #     img_tensor = self.imgconverter.to_torch_RGB(img_bytes)
+        #     embedding = self.imgembedder.infer_embedding(img_tensor)
+        #     umap_embed = self.umap_model.transform(embedding.unsqueeze(0).numpy()).squeeze()
+        #
+        #     self.current_embedid = self.hippomap.learn_embedding(self.hipposeq.X, umap_embed, self.umins, self.umaxs,
+        #                                                          far_ids=None)
 
         return sid, Snodes
 
