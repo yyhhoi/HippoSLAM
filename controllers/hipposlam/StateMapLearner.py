@@ -84,7 +84,7 @@ def SB_PPO_Train():
         model = model_class("MlpPolicy", env, verbose=1)
 
     # Train
-    model.learn(total_timesteps=25000, callback=None)
+    model.learn(total_timesteps=10000, callback=None)
 
     # Save models
     if save_model:

@@ -835,7 +835,6 @@ class StateMapLearnerUmapEmbedding(StateMapLearner):
         sid, Snodes = self.hippomap.simple_umap_state_assignment(
             umap_embed, self.umins, self.umaxs)
         print('sid = %d, sval = %0.4f'%(sid, Snodes[sid]))
-
         self.current_embedid = sid
         # id_list = self.recognize_objects()
         # self.hipposeq.step(id_list)
