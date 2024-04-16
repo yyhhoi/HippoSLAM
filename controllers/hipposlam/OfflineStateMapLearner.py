@@ -10,25 +10,25 @@ def main(run_dir):
     assets_dir = join(run_dir, 'assets')
     os.makedirs(assets_dir, exist_ok=True)
 
-    # # 0: Simulation
-    # ImageSampling(assets_dir)
+    # 0: Simulation
+    ImageSampling(assets_dir)
 
 
-    # 1: Preprocess simulation data
-    load_trajdata_pth = join(assets_dir, 'trajdata.pickle')
-    preprocess_trajdata(assets_dir, load_trajdata_pth)
+    # # 1: Preprocess simulation data
+    # load_trajdata_pth = join(assets_dir, 'trajdata.pickle')
+    # preprocess_trajdata(assets_dir, load_trajdata_pth)
 
-    # 2: MobileNet Embeddings
-    load_img_dir = join(assets_dir, 'imgs')
-    load_trajdf_pth = join(assets_dir, 'trajdf.pickle')
-    convert_images_to_mobilenet_embeddings(assets_dir, load_trajdf_pth, load_img_dir)
-
-    # 3 Umap Embeddings
-    load_embeds_pth = join(assets_dir, 'mobilenet_embeds.pt')
-    load_annotations_pth = join(assets_dir, 'annotations.csv')
-    save_umap_dir = join(assets_dir, 'umap_params')
-    os.makedirs(save_umap_dir, exist_ok=True)
-    convert_embeddings_mobilenet_to_umap(load_embeds_pth, load_annotations_pth, save_umap_dir)
+    # # 2: MobileNet Embeddings
+    # load_img_dir = join(assets_dir, 'imgs')
+    # load_trajdf_pth = join(assets_dir, 'trajdf.pickle')
+    # convert_images_to_mobilenet_embeddings(assets_dir, load_trajdf_pth, load_img_dir)
+    #
+    # # 3 Umap Embeddings
+    # load_embeds_pth = join(assets_dir, 'mobilenet_embeds.pt')
+    # load_annotations_pth = join(assets_dir, 'annotations.csv')
+    # save_umap_dir = join(assets_dir, 'umap_params')
+    # os.makedirs(save_umap_dir, exist_ok=True)
+    # convert_embeddings_mobilenet_to_umap(load_embeds_pth, load_annotations_pth, save_umap_dir)
 
     # # 4 Check if Umap can be loaded correctly
     # load_embeds_pth = join(assets_dir, 'mobilenet_embeds.pt')
@@ -39,7 +39,7 @@ def main(run_dir):
 
 if __name__ == '__main__':
     project_dir = r"D:\\data"
-    experiment_name = 'OfflineStateMapLearner'
+    experiment_name = 'OfflineStateMapLearner_IdList3'
     run_name = 'base'
     run_dir = join(project_dir, experiment_name, run_name)
     os.makedirs(run_dir, exist_ok=True)
