@@ -16,7 +16,7 @@ import gymnasium as gym
 from .Sequences import Sequences, StateDecoder, StateTeacher
 from .utils import save_pickle, read_pickle, Recorder
 from .vision import WebotImageConvertor, MobileNetEmbedder
-from .Embeddings import VAELearner, ContrastiveVAELearner, load_parametric_umap_model
+from .Embeddings import VAELearner, ContrastiveVAELearner
 
 
 class BreakRoom(Supervisor, gym.Env):
@@ -556,6 +556,66 @@ class EmbeddingLearner(Forest):
         embedding = self.imgembedder.infer_embedding(img_tensor)
         return embedding.numpy()
 
+class OmniscientForest(Forest):
+    def __init__(self, maxt=1000, save_trajdata_pth=None):
+        super(OmniscientForest, self).__init__(maxt)
+        self.obs_dim = 6
+        lowBox = np.array([-20, -20, -1, -1, -1, -1], dtype=np.float32)
+        highBox = -1 * lowBox
+        self.observation_space = gym.spaces.Box(lowBox, highBox, shape=(self.obs_dim,))
+
+
+        self.save_trajdata_pth = save_trajdata_pth
+        if self.save_trajdata_pth:
+            self.SW = Recorder('t', 'x', 'y', 'a', 'r', 'terminated', 'truncated')
+        else:
+            self.SW = None
+
+
+    def step(self, action):
+        obs, reward, terminated, truncated, info = super(OmniscientForest, self).step(action)
+        info['Nstates'] = 0
+        if self.save_trajdata_pth:
+            x, y, _ = super()._get_translation()
+            a = super()._get_heading()
+            self.SW.record(t=self.t, x=x, y=y, a=a, r=reward, terminated=terminated, truncated=truncated)
+        # Random
+        # obs = np.random.uniform(-1, 1, size=6)
+        return obs, reward, terminated, truncated, info
+
+    def reset(self, seed=None):
+        # Reset the simulation
+        self.simulationResetPhysics()
+        self.simulationReset()
+        self.steptime()
+
+        # Reset attributes
+        self.stuck_m = 0
+        self.t = 0
+        self.r_bonus_counts = [0] * 4
+
+        # Reset position and velocity
+        x, y, a = self._reset_pose()
+        self.x, self.y = x, y
+        self.rotz, self.rota = -1, a
+        self.init_wheels()
+        self.steptime(5)
+
+        # Save writer
+        if self.save_trajdata_pth and (len(self.SW.records_dict) > 0):
+            self.SW.append_to_pickle(self.save_trajdata_pth)
+        self.SW.clear_records_dict()
+
+        # Infer the first step
+        obs = self.get_obs()
+
+        # Internals
+        self.steptime()
+
+        return obs, {}
+
+
+
 
 class StateMapLearner(Forest):
     def __init__(self, R=5, L=20, maxt=1000, max_hipposlam_states=500,
@@ -815,7 +875,7 @@ class StateMapLearnerVAEEmbedding(StateMapLearner):
 class StateMapLearnerUmapEmbedding(StateMapLearner):
     def __init__(self, R=5, L=20, maxt=1000, max_hipposlam_states=1000,
                  save_hipposlam_pth=None, save_trajdata_pth=None):
-
+        from .Embeddings import load_parametric_umap_model
         super().__init__(R, L, maxt, max_hipposlam_states,
                          save_hipposlam_pth=save_hipposlam_pth, save_trajdata_pth=save_trajdata_pth)
         # Embedding
@@ -825,7 +885,6 @@ class StateMapLearnerUmapEmbedding(StateMapLearner):
         print('Loading Umap')
         load_umap_dir = r'D:\data\OfflineStateMapLearner_IdList3\base\assets\umap_params'
         self.umap_model, self.umins, self.umaxs = load_parametric_umap_model(load_umap_dir)
-        self.embedding_buffer = []
 
     def get_obs_base(self):
         img_bytes = self.cam.getImage()
@@ -834,19 +893,19 @@ class StateMapLearnerUmapEmbedding(StateMapLearner):
         umap_embed = self.umap_model.transform(embedding.unsqueeze(0).numpy()).squeeze()
         sid, Snodes = self.hippomap.simple_umap_state_assignment(
             umap_embed, self.umins, self.umaxs)
-        print('sid = %d, sval = %0.4f'%(sid, Snodes[sid]))
         self.current_embedid = sid
+
+
         # id_list = self.recognize_objects()
         # self.hipposeq.step(id_list)
         # sid, Snodes = self.hippomap.infer_state(self.hipposeq.X)
         #
         # # Image embedding
-        # if (self.hippomap.learn_mode) and (self.t % 5 == 0) and (self.hippomap.current_F > 0):
+        # if (self.hippomap.current_F > 0):
         #     img_bytes = self.cam.getImage()
         #     img_tensor = self.imgconverter.to_torch_RGB(img_bytes)
         #     embedding = self.imgembedder.infer_embedding(img_tensor)
         #     umap_embed = self.umap_model.transform(embedding.unsqueeze(0).numpy()).squeeze()
-        #
         #     self.current_embedid = self.hippomap.learn_embedding(self.hipposeq.X, umap_embed, self.umins, self.umaxs,
         #                                                          far_ids=None)
 

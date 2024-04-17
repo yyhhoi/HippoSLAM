@@ -30,25 +30,25 @@ def main(run_dir):
     # save_umap_dir = join(assets_dir, 'umap_params')
     # os.makedirs(save_umap_dir, exist_ok=True)
     # convert_embeddings_mobilenet_to_umap(load_embeds_pth, load_annotations_pth, save_umap_dir)
-    #
-    # # 4 Check if Umap can be loaded correctly
-    # load_embeds_pth = join(assets_dir, 'mobilenet_embeds.pt')
-    # load_annotations_pth = join(assets_dir, 'annotations.csv')
-    # load_umap_dir = join(assets_dir, 'umap_params')
-    # check_trained_umap_model(load_embeds_pth, load_annotations_pth, load_umap_dir)
 
-
-    # Run Simulation
-    load_trajdf_pth = join(assets_dir, 'trajdf.pickle')
-    load_embedsIndex_pth = join(assets_dir, 'embeds_index.pickle')
+    # 4 Check if Umap can be loaded correctly
+    load_embeds_pth = join(assets_dir, 'mobilenet_embeds.pt')
+    load_annotations_pth = join(assets_dir, 'annotations.csv')
     load_umap_dir = join(assets_dir, 'umap_params')
-    load_umapEmbeds_pth = join(load_umap_dir, 'umap_embeddings.pt')
-    statemap_learn(assets_dir, load_trajdf_pth, load_embedsIndex_pth, load_umapEmbeds_pth, load_umap_dir)
+    check_trained_umap_model(load_embeds_pth, load_annotations_pth, load_umap_dir)
 
 
-    # Analyze simulation result
-    load_simdf_pth = join(assets_dir, 'simdf.csv')
-    analyze_state_specificity(assets_dir, load_simdf_pth)
+    # # Run Simulation
+    # load_trajdf_pth = join(assets_dir, 'trajdf.pickle')
+    # load_embedsIndex_pth = join(assets_dir, 'embeds_index.pickle')
+    # load_umap_dir = join(assets_dir, 'umap_params')
+    # load_umapEmbeds_pth = join(load_umap_dir, 'umap_embeddings.pt')
+    # statemap_learn(assets_dir, load_trajdf_pth, load_embedsIndex_pth, load_umapEmbeds_pth, load_umap_dir)
+
+
+    # # Analyze simulation result
+    # load_simdf_pth = join(assets_dir, 'simdf.csv')
+    # analyze_state_specificity(assets_dir, load_simdf_pth)
 
 if __name__ == '__main__':
     project_dir = r"D:\\data"

@@ -186,12 +186,18 @@ def check_trained_umap_model(load_embeds_pth, load_annotations_pth, load_umap_di
 def plot_umap_embeddings_2d(umap_embeds, ann_df, nneigh, min_dist, metric):
     fig, ax = plt.subplots(2, 2, figsize=(12, 8))
     ax = ax.ravel()
-    im0 = ax[0].scatter(umap_embeds[:, 0], umap_embeds[:, 1], s=1, c=ann_df['x'], cmap='jet', alpha=0.5)
-    plt.colorbar(im0, ax=ax[0])
-    im1 = ax[1].scatter(umap_embeds[:, 0], umap_embeds[:, 1], s=1, c=ann_df['y'], cmap='jet', alpha=0.5)
-    plt.colorbar(im1, ax=ax[1])
-    im2 = ax[2].scatter(umap_embeds[:, 0], umap_embeds[:, 1], s=1, c=ann_df['a'], cmap='hsv', alpha=0.5)
-    plt.colorbar(im2, ax=ax[2])
+    im0 = ax[0].scatter(umap_embeds[:, 0], umap_embeds[:, 1], s=1, c=ann_df['x'], cmap='jet')
+    cbar0 = plt.colorbar(im0, ax=ax[0])
+    cbar0.ax.set_label('x (m)')
+
+    im1 = ax[1].scatter(umap_embeds[:, 0], umap_embeds[:, 1], s=1, c=ann_df['y'], cmap='jet')
+    cbar1 = plt.colorbar(im1, ax=ax[1])
+    cbar1.ax.set_label('y (m)')
+
+    im2 = ax[2].scatter(umap_embeds[:, 0], umap_embeds[:, 1], s=1, c=ann_df['a'], cmap='hsv')
+    cbar2 = plt.colorbar(im2, ax=ax[2])
+    cbar2.ax.set_label(r'$\theta$ (rad)')
+
     txt = f'nneigh={nneigh}\nmindist={min_dist:0.2f}\nmetric={metric}\n' if nneigh is not None else ''
     ax[3].annotate(text=txt, xy=(0.2, 0.5), xycoords='axes fraction')
     ax[3].axis('off')
