@@ -4,20 +4,15 @@ import numpy as np
 import torch
 from matplotlib import pyplot as plt
 from stable_baselines3 import PPO
-from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.env_checker import check_env
-from stable_baselines3.common.callbacks import CheckpointCallback
-
 from torch import nn
-
 from lib.Networks import MLP
-# from lib.ReinforcementLearning import AWAC, A2C, compute_discounted_returns
 from lib.Replay import ReplayMemoryAWAC, ReplayMemoryA2C
 from lib.utils import breakroom_avoidance_policy, save_pickle, Recorder, read_pickle
 from lib.Environments import StateMapLearner, StateMapLearnerTaught, EmbeddingLearner, \
     StateMapLearnerUmapEmbedding, StateMapLearnerImageSaver
-from lib.Environments import ImageSampler, StateMapLearnerVAEEmbedding, OmniscientForest
+from lib.Environments import ImageSampler
 from os.path import join
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
