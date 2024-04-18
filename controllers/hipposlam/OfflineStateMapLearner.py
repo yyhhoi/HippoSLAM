@@ -24,18 +24,18 @@ def main(run_dir):
     # load_trajdf_pth = join(assets_dir, 'trajdf.pickle')
     # convert_images_to_mobilenet_embeddings(assets_dir, load_trajdf_pth, load_img_dir)
 
-    # # 3 Umap Embeddings
-    # load_embeds_pth = join(assets_dir, 'mobilenet_embeds.pt')
-    # load_annotations_pth = join(assets_dir, 'annotations.csv')
-    # save_umap_dir = join(assets_dir, 'umap_params')
-    # os.makedirs(save_umap_dir, exist_ok=True)
-    # convert_embeddings_mobilenet_to_umap(load_embeds_pth, load_annotations_pth, save_umap_dir)
-
-    # 4 Check if Umap can be loaded correctly
+    # 3 Umap Embeddings
     load_embeds_pth = join(assets_dir, 'mobilenet_embeds.pt')
     load_annotations_pth = join(assets_dir, 'annotations.csv')
-    load_umap_dir = join(assets_dir, 'umap_params')
-    check_trained_umap_model(load_embeds_pth, load_annotations_pth, load_umap_dir)
+    save_umap_dir = join(assets_dir, 'umap_params')
+    os.makedirs(save_umap_dir, exist_ok=True)
+    convert_embeddings_mobilenet_to_umap(load_embeds_pth, load_annotations_pth, save_umap_dir)
+
+    # # 4 Check if Umap can be loaded correctly
+    # load_embeds_pth = join(assets_dir, 'mobilenet_embeds.pt')
+    # load_annotations_pth = join(assets_dir, 'annotations.csv')
+    # load_umap_dir = join(assets_dir, 'umap_params')
+    # check_trained_umap_model(load_embeds_pth, load_annotations_pth, load_umap_dir)
 
 
     # # Run Simulation

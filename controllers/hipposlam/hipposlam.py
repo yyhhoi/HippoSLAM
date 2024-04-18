@@ -1,4 +1,4 @@
-"""tabular_qlearning controller."""
+#!/usr/bin/env C:\Users\Hoi\anaconda3\envs\hipposlam_test\python.exe
 
 import numpy as np
 import torch
@@ -27,7 +27,6 @@ os.environ['KMP_DUPLICATE_LIB_OK']='True'
 # - half-supervised: PPO5_OnlyCorrectLearnt_lr1_dp2_da12: Not successful aver. R ~ 0.2
 # - half-supervised: PPO4_HalfSupervised_lr1_dp3_da8: Not successful aver. R ~ 0.438
 # - unsupervised:
-
 def SB_PPO_Train():
     # Modes
     load_model = False
@@ -36,7 +35,7 @@ def SB_PPO_Train():
     model_class = PPO
 
     # Paths
-    save_dir = join('data', 'Omniscient')
+    save_dir = join('data', 'StateMapLearnerUmapEmbedding_test')
     os.makedirs(save_dir, exist_ok=True)
     load_model_name = ''
     save_model_name = 'PPO1'
@@ -49,25 +48,15 @@ def SB_PPO_Train():
     # save_trajdata_pth = None
 
     # Environment
-    # env = StateMapLearnerUmapEmbedding(R=5, L=20, max_hipposlam_states=1000,
-    #                                  save_hipposlam_pth=save_hipposlam_pth, save_trajdata_pth=save_trajdata_pth)
+    env = StateMapLearnerUmapEmbedding(R=5, L=20, max_hipposlam_states=1000,
+                                     save_hipposlam_pth=save_hipposlam_pth, save_trajdata_pth=save_trajdata_pth)
     # env = StateMapLearnerTaught(R=5, L=20,
     #                                  save_hipposlam_pth=save_hipposlam_pth, save_trajdata_pth=save_trajdata_pth)
-    env = OmniscientForest(maxt=1000, save_trajdata_pth=save_trajdata_pth)
+    # env = OmniscientForest(maxt=1000, save_trajdata_pth=save_trajdata_pth)
 
     info_keywords = ('Nstates', 'last_r', 'terminated', 'truncated', 'stuck', 'fallen', 'timeout')
     env = Monitor(env, save_record_pth, info_keywords=info_keywords)
     check_env(env)
-
-
-    # # Save a checkpoint every ? steps
-    # checkpoint_callback = CheckpointCallback(
-    #     save_freq=25000,
-    #     save_path=save_dir,
-    #     name_prefix="checkpoint",
-    #     save_replay_buffer=False,
-    #     save_vecnormalize=False,
-    # )
 
 
     # Load models
@@ -82,7 +71,7 @@ def SB_PPO_Train():
         model = model_class("MlpPolicy", env, verbose=1)
 
     # Train
-    model.learn(total_timesteps=80000, callback=None)
+    model.learn(total_timesteps=80000)
 
     # Save models
     if save_model:
@@ -90,6 +79,7 @@ def SB_PPO_Train():
         # env.unwrapped.save_hipposlam(save_hipposlam_pth)
 
     # print('After training, there are %d states in the hippomap' % (env.hippomap.N))
+
 
 def main():
     SB_PPO_Train()
