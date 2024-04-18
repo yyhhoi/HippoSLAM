@@ -8,7 +8,7 @@ from umap.parametric_umap import ParametricUMAP
 from tqdm import tqdm
 from .Embeddings import save_parametric_umap_model, load_parametric_umap_model
 from .utils import read_pickle, save_pickle
-from .vis import plot_spatial_specificity, compare_spatial_specificity
+from .visualization import plot_spatial_specificity, compare_spatial_specificity
 from .vision import MobileNetEmbedder
 
 from .Sequences import Sequences, StateDecoder

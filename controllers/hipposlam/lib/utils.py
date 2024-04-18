@@ -67,40 +67,6 @@ class Recorder:
         return self.records_dict[key]
 
 
-class TrajWriter:
-    def __init__(self, filename, *args):
-        self.filename = filename
-        self.save_traj_pth = filename + '.csv'
-        self.save_fsigma_pth = filename + '.json'
-        self.traj_fh = None
-        self.fsigma_fh = None
-        for pth in [self.save_traj_pth, self.save_fsigma_pth]:
-            if os.path.exists(pth):
-                os.remove(pth)
-
-        self.traj_fh = open(self.save_traj_pth, 'a')
-        self.fsigma_fh = open(self.save_fsigma_pth, 'a')
-
-        self._write_args_per_line(self.traj_fh, args)
-
-    def write(self, data, *args):
-        json.dump(data, self.fsigma_fh)
-        self.fsigma_fh.write('\n')
-        self._write_args_per_line(self.traj_fh, args)
-
-    def _write_args_per_line(self, fh, args):
-        header = ''.join([f'{arg}, ' for arg in args])
-        fh.write(header[:-2] + '\n')
-
-    def close_fh(self):
-        if self.traj_fh:
-            self.traj_fh.close()
-        if self.fsigma_fh:
-            self.fsigma_fh.close()
-
-
-
-
 
 def breakroom_avoidance_policy(x, y, dsval, noise=0.3):
 
