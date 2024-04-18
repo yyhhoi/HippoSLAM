@@ -30,7 +30,7 @@ $ pip install -r requirements.txt --ignore-requires-python
 # Run a  script in Webots
 ### Open Webots and load the world file
 1. In the top menu bar, click "File" 
-2. Open "World" 
+2. "Open World" 
 3. Open "HippoSLAM/worlds/outdoor.wbt"
 
 
