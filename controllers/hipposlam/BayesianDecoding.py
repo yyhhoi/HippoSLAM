@@ -3,9 +3,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.special import factorial
 
-from hipposlam.utils import read_pickle
-from hipposlam.comput_utils import Arena, circular_gau_filter
-from hipposlam.Sequences import Sequences, createX
+from hipposlam_lib.utils import read_pickle
+from hipposlam_lib.comput_utils import Arena, circular_gau_filter
+from hipposlam_lib.Sequences import Sequences, createX
 from scipy.ndimage import gaussian_filter1d
 from scipy.ndimage import gaussian_filter
 import numpy as np
@@ -38,7 +38,7 @@ for i in range(1, max_chpt_num+1):
         allfsigmalist.extend(trajdict['fsigma'])
 alltrajdf = pd.DataFrame(alltrajdict)
 
-# Load hipposlam
+# Load hipposlam_lib
 load_hipposlam_pth = join(project_dir, chpt_name.replace('$', '%d'%max_chpt_num) + '_hipposlam.pickle')
 hipposlam = read_pickle(load_hipposlam_pth)
 hipposeq = hipposlam['hipposeq']

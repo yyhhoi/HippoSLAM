@@ -1,6 +1,6 @@
 import os
 
-from hipposlam.offline_pipelines import preprocess_trajdata, convert_images_to_mobilenet_embeddings, \
+from hipposlam_lib.offline_pipelines import preprocess_trajdata, convert_images_to_mobilenet_embeddings, \
     convert_embeddings_mobilenet_to_umap, check_trained_umap_model, ImageSampling, statemap_learn, \
     analyze_state_specificity
 from os.path import join

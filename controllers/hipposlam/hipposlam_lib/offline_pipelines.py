@@ -15,7 +15,7 @@ from .Sequences import Sequences, StateDecoder
 
 def ImageSampling(assets_dir):
     from .Environments import StateMapLearnerImageSaver
-    save_hipposlam_pth = join(assets_dir, 'hipposlam.pickle')
+    save_hipposlam_pth = join(assets_dir, 'hipposlam_lib.pickle')
     save_trajdata_pth = join(assets_dir, 'trajdata.pickle')
     save_img_dir = join(assets_dir, 'imgs')
     os.makedirs(save_img_dir, exist_ok=True)
@@ -225,7 +225,7 @@ def statemap_learn(assets_dir, load_trajdf_pth, load_embedsIndex_pth, load_umapE
     umaxs = torch.load(join(load_umap_dir, 'umaxs.pt'))
 
 
-    # Initialize hipposlam
+    # Initialize hipposlam_lib
     hipposeq = Sequences(R=R, L=L, reobserve=False)
     hippomap = StateDecoder(R=R, L=L, maxN=1000, area_norm=True)
     hippomap.set_lowSthresh(0.98)
