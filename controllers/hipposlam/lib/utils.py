@@ -5,6 +5,9 @@ import pandas as pd
 import numpy as np
 import copy
 
+def midedges(edges):
+    return (edges[:-1] + edges[1:]) / 2
+
 def save_pickle(save_path, data):
     with open(save_path, 'wb') as f:
         pickle.dump(data, f)

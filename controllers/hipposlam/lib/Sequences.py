@@ -4,7 +4,7 @@ from .Embeddings import measure_umap_similarity
 from .circ import cdiff
 from scipy.signal import convolve
 from collections import OrderedDict
-from .comput_utils import midedges
+from .utils import midedges
 
 
 def createX(R, F, K, stored_f, f_sigma):
