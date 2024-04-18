@@ -3,6 +3,4 @@
 /controllers/hipposlam/data/
 *__pycache__
 *.pyc
-.idea/misc.xml
-.idea/sshConfigs.xml
-.idea/webServers.xml
+.idea
