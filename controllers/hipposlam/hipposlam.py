@@ -2,7 +2,7 @@
 from stable_baselines3 import PPO
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.env_checker import check_env
-from lib.Environments import StateMapLearnerTaught, StateMapLearnerUmapEmbedding, StateMapLearnerImageSaver
+from lib.Environments import StateMapLearnerTaught, StateMapLearnerUmapEmbedding
 from os.path import join
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'

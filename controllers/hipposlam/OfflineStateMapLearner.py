@@ -47,8 +47,8 @@ def main(run_dir):
 
 
     # # Analyze simulation result
-    # load_simdf_pth = join(assets_dir, 'simdf.csv')
-    # analyze_state_specificity(assets_dir, load_simdf_pth)
+    load_simdf_pth = join(assets_dir, 'simdf.csv')
+    analyze_state_specificity(assets_dir, load_simdf_pth)
 
 if __name__ == '__main__':
     project_dir = r"D:\\data"
