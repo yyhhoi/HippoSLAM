@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import umap
 from tqdm import tqdm
-from hipposlam_lib.Embeddings import EmbeddingImageDatasetAll, VAELearner, convert_to_embed
+from hipposlam.Embeddings import EmbeddingImageDatasetAll, VAELearner, convert_to_embed
 import torch
 from torch.utils.data import DataLoader
 import pickle

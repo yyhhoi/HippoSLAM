@@ -1,4 +1,4 @@
-from hipposlam_lib.Embeddings import TrainContrastiveVAE, convert_to_embed
+from hipposlam.Embeddings import TrainContrastiveVAE, convert_to_embed
 import logging
 if __name__ == "__main__":
     # logging.basicConfig(level=logging.INFO)

@@ -3,14 +3,14 @@ import os
 import pandas as pd
 from matplotlib import pyplot as plt
 
-from hipposlam_lib.DataLoaders import ContrastiveEmbeddingDataloader
+from hipposlam.DataLoaders import ContrastiveEmbeddingDataloader
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 from os.path import join
 import numpy as np
 import torch
 import umap
-from hipposlam_lib.Embeddings import get_dataloaders, VAELearner, ContrastiveVAELearner
+from hipposlam.Embeddings import get_dataloaders, VAELearner, ContrastiveVAELearner
 from sklearn.decomposition import PCA
 
 def loop_and_plot_umap(embeds, xya, ax3txtext, save_plot_dir):

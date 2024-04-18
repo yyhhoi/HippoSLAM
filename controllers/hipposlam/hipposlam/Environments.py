@@ -681,7 +681,7 @@ class StateMapLearner(Forest):
         self.init_wheels()
         self.steptime(5)
 
-        # Reset hipposlam_lib
+        # Reset hipposlam
         self.hipposeq.reset_activity()
         self.hippomap.reset()
         self.t = 0

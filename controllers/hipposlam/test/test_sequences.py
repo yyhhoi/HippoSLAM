@@ -3,7 +3,7 @@ import numpy as np
 
 from hipposlam.sequences import Sequences
 
-# $ cd hipposlam_lib
+# $ cd hipposlam
 # $ python -m unittest test.test_sequences
 
 class SequencesTestCase(unittest.TestCase):

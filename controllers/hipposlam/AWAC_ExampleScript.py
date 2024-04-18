@@ -5,9 +5,9 @@ import gymnasium as gym
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
-from hipposlam_lib.Networks import ActorModel, QCriticModel, MLP
-from hipposlam_lib.Replay import ReplayMemoryAWAC
-from hipposlam_lib.ReinforcementLearning import AWAC
+from hipposlam.Networks import ActorModel, QCriticModel, MLP
+from hipposlam.Replay import ReplayMemoryAWAC
+from hipposlam.ReinforcementLearning import AWAC
 
 # Paths and parameters
 env = gym.make("CartPole-v1")

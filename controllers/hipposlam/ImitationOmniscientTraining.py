@@ -4,10 +4,10 @@ import numpy as np
 import torch
 from matplotlib import pyplot as plt
 
-from hipposlam_lib.ReinforcementLearning import AWAC
-from hipposlam_lib.Replay import ReplayMemoryAWAC
-from hipposlam_lib.Networks import MLP
-from hipposlam_lib.utils import read_pickle
+from hipposlam.ReinforcementLearning import AWAC
+from hipposlam.Replay import ReplayMemoryAWAC
+from hipposlam.Networks import MLP
+from hipposlam.utils import read_pickle
 
 
 # Paths
