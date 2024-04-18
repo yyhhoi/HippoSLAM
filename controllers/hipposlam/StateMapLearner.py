@@ -11,13 +11,13 @@ from stable_baselines3.common.callbacks import CheckpointCallback
 
 from torch import nn
 
-from hipposlam.Networks import MLP
-# from hipposlam.ReinforcementLearning import AWAC, A2C, compute_discounted_returns
-from hipposlam.Replay import ReplayMemoryAWAC, ReplayMemoryA2C
-from hipposlam.utils import breakroom_avoidance_policy, save_pickle, Recorder, read_pickle
-from hipposlam.Environments import StateMapLearner, StateMapLearnerTaught, EmbeddingLearner, \
+from lib.Networks import MLP
+# from lib.ReinforcementLearning import AWAC, A2C, compute_discounted_returns
+from lib.Replay import ReplayMemoryAWAC, ReplayMemoryA2C
+from lib.utils import breakroom_avoidance_policy, save_pickle, Recorder, read_pickle
+from lib.Environments import StateMapLearner, StateMapLearnerTaught, EmbeddingLearner, \
     StateMapLearnerUmapEmbedding, StateMapLearnerImageSaver
-from hipposlam.Environments import ImageSampler, StateMapLearnerVAEEmbedding, OmniscientForest
+from lib.Environments import ImageSampler, StateMapLearnerVAEEmbedding, OmniscientForest
 from os.path import join
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
@@ -114,7 +114,7 @@ def ImageSampling():
     base_dir = r'D:'
     project_tag = 'ImageSamplingHippoSeq'
     project_dir = join(base_dir, 'data', project_tag)
-    save_hipposlam_pth = join(project_dir, 'hipposlam.pickle')
+    save_hipposlam_pth = join(project_dir, 'lib.pickle')
     save_trajdata_pth = join(project_dir, 'trajdata.pickle')
     save_img_dir = join(project_dir, 'imgs')
     os.makedirs(project_dir, exist_ok=True)
@@ -279,7 +279,7 @@ def fine_tune_trained_model():
     offline_data_pth = join('data', 'StateMapLearner', 'AvoidanceReplayBuffer.pickle')
     load_ckpt_pth = join('data', 'StateMapLearner', 'NaiveControllerCKPT.pt')
     # load_ckpt_pth = join('data', 'StateMapLearner', 'FineTuned1.pt')
-    load_hipposlam_pth = join('data', 'StateMapLearner', 'hipposlam.pickle')
+    load_hipposlam_pth = join('data', 'StateMapLearner', 'lib.pickle')
     save_model_name = 'FineTuned1'
     save_ckpt_pth = join('data', 'StateMapLearner', '%s.pt'%save_model_name)
     save_buffer_pth = join('data', 'StateMapLearner', 'ReplayBuffer_%s.pt'%save_model_name)
@@ -388,7 +388,7 @@ def evaluate_trained_model():
     hipposlam_learn = False
 
     # Paths
-    load_hipposlam_pth = join('data', 'StateMapLearner', 'hipposlam.pickle')
+    load_hipposlam_pth = join('data', 'StateMapLearner', 'lib.pickle')
     save_hipposlam_pth = join('data', 'StateMapLearner', 'hipposlam2.pickle')
     load_ckpt_pth = join('data', 'StateMapLearner', 'NavieControllerCKPT.pt')
     save_record_pth = join('data', 'StateMapLearner', 'NavieControllerCKPT_Performance.csv')
@@ -459,8 +459,8 @@ def naive_avoidance():
 
     # Paths
     save_replay_pth = join('data', 'StateMapLearner', 'AvoidanceReplayBuffer.pickle')
-    load_hipposlam_pth = join('data', 'StateMapLearner', 'hipposlam.pickle')
-    save_hipposlam_pth = join('data', 'StateMapLearner', 'hipposlam.pickle')
+    load_hipposlam_pth = join('data', 'StateMapLearner', 'lib.pickle')
+    save_hipposlam_pth = join('data', 'StateMapLearner', 'lib.pickle')
     save_record_pth = join('data', 'StateMapLearner', 'NaiveAvoidanceController_Performance.csv')
 
     # Environment

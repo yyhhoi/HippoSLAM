@@ -9,13 +9,13 @@ from stable_baselines3.common.callbacks import CheckpointCallback
 
 from torch import nn
 
-from hipposlam.Networks import MLP
-# from hipposlam.ReinforcementLearning import AWAC, A2C, compute_discounted_returns
-from hipposlam.Replay import ReplayMemoryAWAC, ReplayMemoryA2C
-from hipposlam.utils import breakroom_avoidance_policy, save_pickle, Recorder, read_pickle
-from hipposlam.Environments import StateMapLearner, StateMapLearnerTaught, EmbeddingLearner, \
+from lib.Networks import MLP
+# from lib.ReinforcementLearning import AWAC, A2C, compute_discounted_returns
+from lib.Replay import ReplayMemoryAWAC, ReplayMemoryA2C
+from lib.utils import breakroom_avoidance_policy, save_pickle, Recorder, read_pickle
+from lib.Environments import StateMapLearner, StateMapLearnerTaught, EmbeddingLearner, \
     StateMapLearnerUmapEmbedding, StateMapLearnerImageSaver
-from hipposlam.Environments import ImageSampler, StateMapLearnerVAEEmbedding, OmniscientForest
+from lib.Environments import ImageSampler, StateMapLearnerVAEEmbedding, OmniscientForest
 from os.path import join
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'

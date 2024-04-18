@@ -1,4 +1,4 @@
-name: hipposlam
+name: lib
 channels:
   - pytorch
   - defaults

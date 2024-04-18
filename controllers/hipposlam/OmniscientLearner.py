@@ -7,11 +7,11 @@ from os.path import join
 
 from matplotlib import pyplot as plt
 
-from hipposlam.Replay import ReplayMemoryAWAC, ReplayMemoryA2C
-from hipposlam.utils import save_pickle, read_pickle, breakroom_avoidance_policy, Recorder
-from hipposlam.Networks import MLP
-from hipposlam.ReinforcementLearning import AWAC, A2C, compute_discounted_returns
-from hipposlam.Environments import OmniscientLearner
+from lib.Replay import ReplayMemoryAWAC, ReplayMemoryA2C
+from lib.utils import save_pickle, read_pickle, breakroom_avoidance_policy, Recorder
+from lib.Networks import MLP
+from lib.ReinforcementLearning import AWAC, A2C, compute_discounted_returns
+from lib.Environments import OmniscientLearner
 from stable_baselines3 import PPO
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.env_checker import check_env
