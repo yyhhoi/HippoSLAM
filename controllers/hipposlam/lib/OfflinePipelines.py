@@ -13,31 +13,28 @@ from .vision import MobileNetEmbedder
 
 from .Sequences import Sequences, StateDecoder
 
-def ImageSampling(assets_dir):
+def ImageSampling(run_dir):
+    # The StateMapLearnerImageSaver is imported here as it would require the Webots libraries, which cannot be
+    # conveniently imported in the terminal.
     from .Environments import StateMapLearnerImageSaver
-    save_hipposlam_pth = join(assets_dir, 'lib.pickle')
-    save_trajdata_pth = join(assets_dir, 'trajdata.pickle')
-    save_img_dir = join(assets_dir, 'imgs')
+    save_hipposlam_pth = join(run_dir, 'lib.pickle')
+    save_trajdata_pth = join(run_dir, 'trajdata.pickle')
+    save_img_dir = join(run_dir, 'imgs')
     os.makedirs(save_img_dir, exist_ok=True)
-
     env = StateMapLearnerImageSaver(R=5, L=20, maxt=1000, max_hipposlam_states=500,
                  save_hipposlam_pth=save_hipposlam_pth, save_trajdata_pth=save_trajdata_pth, save_img_dir=save_img_dir)
-
     max_img_num = 10000
     env.c = 0
     while env.c < max_img_num:
         print(r'%d/%d'%(env.c, max_img_num), end='', flush=True)
         env.reset()
-
         terminated = False
         truncated = False
-
         while (not terminated) and (not truncated):
             s, reward, terminated, truncated, info = env.step(np.random.choice(4))
-
     env.reset()
 
-def preprocess_trajdata(assets_dir, load_trajdata_pth):
+def preprocess_trajdata(run_dir):
     """
     Concatenate a list of episode data and generate a dataframe.
     Load:
@@ -45,7 +42,7 @@ def preprocess_trajdata(assets_dir, load_trajdata_pth):
     Save:
         trajdf.pickle
     """
-
+    load_trajdata_pth = join(run_dir, 'trajdata.pickle')
     keys = ['x', 'y', 'a', 't', 'id_list', 'c']
     data_dict = {key: [] for key in keys}
     trajdata = read_pickle(load_trajdata_pth)  # list of dicts. The key in the dict contains a list of data.
@@ -59,10 +56,9 @@ def preprocess_trajdata(assets_dir, load_trajdata_pth):
     f = lambda x: str(x['c']) + '_' + str(x['t']) + '.png'
     trajdf['img_name'] = trajdf.apply(f, axis=1)
     trajdf['img_exist'] = trajdf['t'] % 5 == 0
-    trajdf.to_pickle(join(assets_dir, 'trajdf.pickle'))
-    return trajdf
+    trajdf.to_pickle(join(run_dir, 'trajdf.pickle'))
 
-def convert_images_to_mobilenet_embeddings(assets_dir, load_trajdf_pth, load_img_dir):
+def convert_images_to_mobilenet_embeddings(run_dir):
     """
     Load:
         trajdf.pickle
@@ -72,6 +68,9 @@ def convert_images_to_mobilenet_embeddings(assets_dir, load_trajdf_pth, load_img
         mobilenet_embeds.pt
         annotations.csv
     """
+    # Paths
+    load_trajdf_pth = join(run_dir, 'trajdf.pickle')
+    load_img_dir = join(run_dir, 'imgs')
 
     # Load embeddings
     trajdf = read_pickle(load_trajdf_pth)
@@ -81,9 +80,9 @@ def convert_images_to_mobilenet_embeddings(assets_dir, load_trajdf_pth, load_img
 
     # Save annotations and indexes
     annotations = subdf[['x', 'y', 'a']].reset_index(drop=True)
-    annotations.to_csv(join(assets_dir, 'annotations.csv'))
+    annotations.to_csv(join(run_dir, 'annotations.csv'))
     embed_index = {subdf.index[i]: i for i in range(len(subdf.index))}
-    save_pickle(join(assets_dir, 'embeds_index.pickle'), embed_index)
+    save_pickle(join(run_dir, 'embeds_index.pickle'), embed_index)
 
     # Infer embeddings
     num_imgs = len(img_name_list)
@@ -94,11 +93,10 @@ def convert_images_to_mobilenet_embeddings(assets_dir, load_trajdf_pth, load_img
         embeds[i, :] = embedder.infer_embedding_from_path(load_img_pth).squeeze()  # -> (576, )
 
     # Save embeddings
-    torch.save(embeds, join(assets_dir, 'mobilenet_embeds.pt'))
-    return embeds
+    torch.save(embeds, join(run_dir, 'mobilenet_embeds.pt'))
 
 
-def convert_embeddings_mobilenet_to_umap(load_embeds_pth, load_annotations_pth, save_umap_dir):
+def convert_embeddings_mobilenet_to_umap(run_dir):
     """
     Load:
         mobilenet_embeds.pt
@@ -116,6 +114,11 @@ def convert_embeddings_mobilenet_to_umap(load_embeds_pth, load_annotations_pth, 
         save_umap_dir/model.pkl
         save_umap_dir/parametric_model.keras
     """
+    # Paths
+    save_umap_dir = join(run_dir, 'umap_params')
+    os.makedirs(save_umap_dir, exist_ok=True)
+    load_embeds_pth = join(run_dir, 'mobilenet_embeds.pt')
+    load_annotations_pth = join(run_dir, 'annotations.csv')
 
     # Load embeds
     mobilenet_embeds = torch.load(load_embeds_pth)
@@ -157,7 +160,7 @@ def convert_embeddings_mobilenet_to_umap(load_embeds_pth, load_annotations_pth, 
     fig.savefig(join(save_umap_dir, 'umap_embeds_vis.png'), dpi=300)
 
 
-def check_trained_umap_model(load_embeds_pth, load_annotations_pth, load_umap_dir):
+def check_trained_umap_model(run_dir):
     """
     Load:
         mobilenet_embeds.pt
@@ -167,6 +170,11 @@ def check_trained_umap_model(load_embeds_pth, load_annotations_pth, load_umap_di
         save_umap_dir/umap_embeds_vis_check.png
 
     """
+    load_umap_dir = join(run_dir, 'umap_params')
+    os.makedirs(load_umap_dir, exist_ok=True)
+    load_embeds_pth = join(run_dir, 'mobilenet_embeds.pt')
+    load_annotations_pth = join(run_dir, 'annotations.csv')
+
 
     # Load mobilenet embeds
     mobilenet_embeds = torch.load(load_embeds_pth)
@@ -204,7 +212,7 @@ def plot_umap_embeddings_2d(umap_embeds, ann_df, nneigh, min_dist, metric):
     fig.tight_layout()
     return fig, ax
 
-def statemap_learn(assets_dir, load_trajdf_pth, load_embedsIndex_pth, load_umapEmbeds_pth, load_umap_dir):
+def statemap_learn(run_dir):
     """
     Load:
         trajdf.pickle
@@ -216,6 +224,12 @@ def statemap_learn(assets_dir, load_trajdf_pth, load_embedsIndex_pth, load_umapE
     """
     # Parameters
     R, L = 5, 20
+
+    # Paths
+    load_trajdf_pth = join(run_dir, 'trajdf.pickle')
+    load_embedsIndex_pth = join(run_dir, 'embeds_index.pickle')
+    load_umap_dir = join(run_dir, 'umap_params')
+    load_umapEmbeds_pth = join(load_umap_dir, 'umap_embeddings.pt')
 
     # Load data
     trajdf = read_pickle(load_trajdf_pth)
@@ -250,7 +264,6 @@ def statemap_learn(assets_dir, load_trajdf_pth, load_embedsIndex_pth, load_umapE
             df_dict['targ_sid'].append(-1)
 
         sid, Snodes = hippomap.infer_state(hipposeq.X)
-
         df_dict['pred_sid'].append(sid)
         df_dict['x'].append(x)
         df_dict['y'].append(y)
@@ -259,20 +272,21 @@ def statemap_learn(assets_dir, load_trajdf_pth, load_embedsIndex_pth, load_umapE
         df_dict['img_exist'].append(img_exist)
 
     df = pd.DataFrame(df_dict)
-    df.to_csv(join(assets_dir, 'simdf.csv'))
+    df.to_csv(join(run_dir, 'simdf.csv'))
 
 
-def analyze_state_specificity(assets_dir, load_simdf_pth):
-    save_dir = join(assets_dir, 'state_specificity')
+def analyze_state_specificity(run_dir):
+    # Paths
+    load_simdf_pth = join(run_dir, 'simdf.csv')
+    save_dir = join(run_dir, 'state_specificity')
     os.makedirs(save_dir, exist_ok=True)
 
-
+    # Load dataframe
     simdf = pd.read_csv(load_simdf_pth)
 
     simdf['offset'] = simdf['img_name'].apply(lambda x: int(x.split('.')[0].split('_')[1])) % 5
     embeddf = simdf[simdf['img_exist']]
     embedids = embeddf['targ_sid'].to_numpy()
-    predsids = simdf['pred_sid'].to_numpy()
     unique_embedids = np.unique(embedids)
 
     print(f'Num unique states = {unique_embedids.shape[0]}')

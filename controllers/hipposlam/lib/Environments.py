@@ -7,7 +7,7 @@ from skimage.io import imsave
 
 from controller import Supervisor
 import gymnasium as gym
-
+from .Embeddings import load_parametric_umap_model
 from .Sequences import Sequences, StateDecoder, StateTeacher
 from .utils import save_pickle, read_pickle, Recorder
 from .vision import WebotImageConvertor, MobileNetEmbedder
@@ -429,41 +429,47 @@ class StateMapLearnerImageSaver(StateMapLearner):
 
 
 class StateMapLearnerUmapEmbedding(StateMapLearner):
-    def __init__(self, R=5, L=20, maxt=1000, max_hipposlam_states=1000,
+    def __init__(self, agent_type, load_umap_dir, R=5, L=20, maxt=1000, max_hipposlam_states=1000,
                  save_hipposlam_pth=None, save_trajdata_pth=None):
-        from .Embeddings import load_parametric_umap_model
+
         super().__init__(R, L, maxt, max_hipposlam_states,
                          save_hipposlam_pth=save_hipposlam_pth, save_trajdata_pth=save_trajdata_pth)
+
+        # Mode
+        assert (agent_type == 'UmapDirect') or (agent_type == 'RegressedToUmapState')
+        self.agent_type = agent_type
+
+        # Load umap model
+        print('Loading Umap')
+        self.umap_model, self.umins, self.umaxs = load_parametric_umap_model(load_umap_dir)
+
         # Embedding
         self.imgconverter = WebotImageConvertor(self.cam_height, self.cam_width)
         self.imgembedder = MobileNetEmbedder()
         self.hippomap.set_lowSthresh(0.98)
-        print('Loading Umap')
-        load_umap_dir = r'D:\data\OfflineStateMapLearner_IdList3\base\assets\umap_params'
-        self.umap_model, self.umins, self.umaxs = load_parametric_umap_model(load_umap_dir)
+
 
     def get_obs_base(self):
         img_bytes = self.cam.getImage()
         img_tensor = self.imgconverter.to_torch_RGB(img_bytes)
         embedding = self.imgembedder.infer_embedding(img_tensor)
         umap_embed = self.umap_model.transform(embedding.unsqueeze(0).numpy()).squeeze()
-        sid, Snodes = self.hippomap.simple_umap_state_assignment(
-            umap_embed, self.umins, self.umaxs)
-        self.current_embedid = sid
 
 
-        # id_list = self.recognize_objects()
-        # self.hipposeq.step(id_list)
-        # sid, Snodes = self.hippomap.infer_state(self.hipposeq.X)
-        #
-        # # Image embedding
-        # if (self.hippomap.current_F > 0):
-        #     img_bytes = self.cam.getImage()
-        #     img_tensor = self.imgconverter.to_torch_RGB(img_bytes)
-        #     embedding = self.imgembedder.infer_embedding(img_tensor)
-        #     umap_embed = self.umap_model.transform(embedding.unsqueeze(0).numpy()).squeeze()
-        #     self.current_embedid = self.hippomap.learn_embedding(self.hipposeq.X, umap_embed, self.umins, self.umaxs,
-        #                                                          far_ids=None)
+        if self.agent_type == 'UmapDirect':
+            sid, Snodes = self.hippomap.simple_umap_state_assignment(
+                umap_embed, self.umins, self.umaxs)
+            self.current_embedid = sid
+
+        elif self.agent_type == 'RegressedToUmapState':
+            id_list = self.recognize_objects()
+            self.hipposeq.step(id_list)
+            sid, Snodes = self.hippomap.infer_state(self.hipposeq.X)
+            if (self.hippomap.current_F > 0):
+                self.current_embedid = self.hippomap.learn_embedding(self.hipposeq.X, umap_embed, self.umins, self.umaxs,
+                                                                     far_ids=None)
+        else:
+            raise ValueError('Unrecognized agent type')
 
         return sid, Snodes
 

@@ -33,7 +33,7 @@ $ pip install -r requirements.txt --ignore-requires-python
 
 
 ### Use our Conda environment in the Webots simulation
-1. in the top menu bar, click "Preferences" 
+1. In the top menu bar, click "Preferences" 
 2. in "Python command", enter "\<PATH\>/anaconda3/envs/hipposlam/bin/python3"
 3. The path above should be your hipposlam conda environment executable. Replace \<PATH\> with the path to your Anaconda directory. By default it is the home directory.
    
@@ -43,8 +43,13 @@ $ pip install -r requirements.txt --ignore-requires-python
 2. Click "controller" field in the expanded tree. 
 3. The controller name will be shown in the field below. By default, it is "<extern>", which means the controller script is provided by an external IDE. 
 4. To simply try out the script, click "Select..." and change it to "hipposlam", which will runs the script at "controllers/hipposlam/hipposlam.py" within the simulator.
-5. (Optional) To use your own IDE, see the [official documentation](https://cyberbotics.com/doc/guide/using-your-ide).
 
 ### Run the script
 1. At the top bar, click the play-forward icon to run the script with normal speed (press "Ctrl + 2" in Ubuntu).
 2. To run the script faster , click the fast-forward icon  (press "Ctrl + 3" in Ubuntu).
+3. If the script runs successfully, which means the environment has set up correctly.
+
+### (Recommended) Use your own IDE
+1. To use your own IDE, see the [official documentation](https://cyberbotics.com/doc/guide/using-your-ide). 
+2. It is better to use your own IDE, since Webots only looks for the controller script at "controller_name/controller_name.py". To run other scripts for your analysis, you would need your IDE imported with Webots controller libraries.
+
