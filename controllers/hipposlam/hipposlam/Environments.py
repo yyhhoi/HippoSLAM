@@ -1,14 +1,10 @@
 import copy
 import os
 from os.path import join
-from pprint import PrettyPrinter
 
-import joblib
 import numpy as np
 import torch
 from skimage.io import imsave
-from sklearn.decomposition import IncrementalPCA
-from stable_baselines3.common.callbacks import CheckpointCallback
 
 from controller import Supervisor
 import gymnasium as gym
