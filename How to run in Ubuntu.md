@@ -1,5 +1,11 @@
 This documentation guides how to run the simulations in Ubuntu.
 
+Prerequisites:
+- Anaconda
+
+You can also use pyenv for creating a python environment. 
+
+
 # Installing Webots
 1. Go to https://github.com/cyberbotics/webots/releases
 2. It is recommanded to choose the R2023b version, on which the project is developed.
@@ -22,14 +28,14 @@ $ pip install -r requirements.txt --ignore-requires-python
 # Run a  script in Webots
 ### Open Webots and load the world file
 1. In the top menu bar, click "File" 
-2. "Open World" 
+2. Open "World" 
 3. Open "HippoSLAM/worlds/outdoor.wbt"
 
 
 ### Use our Conda environment in the Webots simulation
 1. in the top menu bar, click "Preferences" 
-2. in "Python command", enter "<PATH>/anaconda3/envs/hipposlam/bin/python3"
-3. The path above should be your hipposlam conda environment executable. Replace <PATH> with the path to your Anaconda directory. By default it is the home directory.
+2. in "Python command", enter "\<PATH\>/anaconda3/envs/hipposlam/bin/python3"
+3. The path above should be your hipposlam conda environment executable. Replace \<PATH\> with the path to your Anaconda directory. By default it is the home directory.
    
 	
 ### Select the python controller script for our robot.
