@@ -17,21 +17,6 @@ def read_pickle(read_path):
         data = pickle.load(f)
     return data
 
-# Function to append a nested dictionary to a file
-def append_dict_to_json(data, filename):
-    with open(filename, 'a') as file:
-        json.dump(data, file)
-        file.write('\n')
-
-def load_dict_from_json(filename):
-    data = []
-    with open(filename, 'r') as file:
-        for line in file:
-            # Load each line (which should contain a JSON object) and append to data list
-            data.append(json.loads(line))
-    return data
-
-
 class Recorder:
     def __init__(self, *args):
         self.records_dict = {key:[] for key in args}
@@ -67,27 +52,6 @@ class Recorder:
         return self.records_dict[key]
 
 
-
-def breakroom_avoidance_policy(x, y, dsval, noise=0.3):
-
-    a = 0
-    if dsval < 95:
-        if x > 2:  # First room
-            a = 2  # right
-        elif (x < 2 and x > -2.7) and (y < 1.45):  # middle room, lower half
-            a = 2  # right
-
-        elif (x < 2 and x > -2.7) and (y > 1.45):  # middle room, upper half
-            a = 1  # left
-        else:  # Final Room
-            a = 1  # left
-    else:
-        a = 0
-
-    if np.random.rand() < noise:
-        a = int(np.random.randint(0, 4))
-
-    return a
 
 
 
