@@ -13,7 +13,7 @@ You can also use pyenv for creating a python environment.
 
 # Clone the Repo
 ```bash
-$ git clone https://github.com/yyhhoi/HippoSLAM
+$ git clone https://github.com/yyhhoi/HippoSLAM/tree/onlyhipposlam
 ```
 
 # Set up Conda environment
