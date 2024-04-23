@@ -165,11 +165,23 @@ def StartOnlineA2C():
 
 
 def random_agent():
+    # =============================================================================
+    # ============================= Modifiable ====================================
+    # =============================================================================
+    # Project identifiers
+    experiment = 'ImitationLearningDemo'
+    run = 'RandomAgent'
+
+    # Parameters of the run
+    NumEndsRequired = 100  # Number of episode until the simulation stops
+    MaxTimeOut = 1000  # Maximum time steps for each episode
+    # =============================================================================
+    # =============================================================================
+
     # Paths
-    save_dir = join('data', 'RandomAgent')
+    save_dir = join('data', experiment, run)
     os.makedirs(save_dir, exist_ok=True)
-    model_name = 'RandomAgent'
-    save_trajall_pth = join(save_dir, '%s_TrajectoryRecords.csv' % model_name)
+    save_trajall_pth = join(save_dir, 'TrajectoryRecords.csv')
 
     # Environment
     env = OmniscientLearner(spawn='start', goal='hard')
@@ -179,8 +191,7 @@ def random_agent():
 
     cum_end = 0
     i = 0
-    maxtimeout = 1000
-    while cum_end <= 100:
+    while cum_end <= NumEndsRequired:
         print('Iter %d, cum_end = %d'%(i, cum_end))
         s, _ = env.reset()
         t = 0
@@ -201,7 +212,7 @@ def random_agent():
             t += 1
 
             # Termination condition
-            if done or (t >= maxtimeout) or truncated:
+            if done or (t >= MaxTimeOut) or truncated:
                 msg = "Done" if done else "Timeout/Stuck"
                 cum_end += 1
                 print(msg)
@@ -220,20 +231,29 @@ def random_agent():
 
 
 def naive_avoidance():
+    # =============================================================================
+    # ============================= Modifiable ====================================
+    # =============================================================================
+    # Project identifiers
+    experiment = 'ImitationLearningDemo'
+    run = 'NaiveAvoidance'
+
+    # Parameters of the run
+    NumWinsRequired = 50  # Number of wins until the simulation stops
+    MaxTimeOut = 500  # Maximum time steps for each episode
+    # =============================================================================
+    # =============================================================================
+
     # Paths
-    save_dir = join('data', 'NaiveControllerDemo')
+    save_dir = join('data', experiment, run)
     os.makedirs(save_dir, exist_ok=True)
-    model_name = 'NaiveControllerDemo'
-    save_replay_pth = join('data', 'OmniscientLearner', '%s_ReplayBuffer.pickle'%model_name)
-    save_record_pth = join('data', 'OmniscientLearner', '%s_Performance.csv'%model_name)
-    save_trajall_pth = join(save_dir, '%s_TrajectoryRecords.csv' % model_name)
+    save_replay_pth = join(save_dir, 'ReplayBuffer.pickle')
+    save_trajall_pth = join(save_dir, 'TrajectoryRecords.csv')
 
     # Environment
     env = OmniscientLearner(spawn='start', goal='hard')
     x_norm = env.x_norm
     y_norm = env.y_norm
-    # Record data and epsidoes
-    PRtraj = Recorder('i', 't', 'r', 'done')
 
     # Record trajectory data
     PRtrajall = Recorder('i', 't', 'x', 'y', 'cosa', 'sina', 'r', 'done', 'truncated')
@@ -241,8 +261,7 @@ def naive_avoidance():
     data = {'episodes':[], 'end_r':[], 't':[]}
     cum_win = 0
     i = 0
-    maxtimeout = 500
-    while cum_win <= 50:
+    while cum_win <= NumWinsRequired:
         print('Iter %d, cum_win = %d'%(i, cum_win))
         s, _ = env.reset()
         exp_list = []
@@ -259,21 +278,18 @@ def naive_avoidance():
             # Store data
             PRtrajall.record(i=i, t=t, x=s[0], y=s[1], cosa=s[4], sina=s[5], r=r, done=int(done), truncated=int(truncated))
 
-
-            # Store data
+            # Store Replay Data for AWAC
             experience = np.concatenate([
                 s, np.array([a]), snext, np.array([r]), np.array([done])
             ])
-
             exp_list.append(experience)
-
 
             # Increment
             s = snext
             t += 1
 
             # Termination condition
-            if done or (t >= maxtimeout) or truncated:
+            if done or (t >= MaxTimeOut) or truncated:
                 msg = "Done" if done else "Timeout/Stuck"
                 if done:
                     cum_win += 1
@@ -291,7 +307,6 @@ def naive_avoidance():
 
     # Saving
     save_pickle(save_replay_pth, data)
-    # PRtraj.to_csv(save_record_pth)
     PRtrajall.to_csv(save_trajall_pth)
 
 def fine_tune_trained_model():
@@ -504,10 +519,11 @@ def evaluate_trained_model():
 
 def main():
     # naive_avoidance()
-    evaluate_trained_model()
+    random_agent()
+    # evaluate_trained_model()
     # fine_tune_trained_model()
     # StartOnlineA2C()
     # SB_PPO_Train()
-    # random_agent()
+
 if __name__ == '__main__':
     main()
