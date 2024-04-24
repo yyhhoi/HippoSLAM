@@ -221,11 +221,11 @@ def random_agent():
 
 def naive_avoidance():
     # Paths
-    save_dir = join('data', 'NaiveControllerDemo')
+    save_dir = join('data', 'OmniscientLearner_Reproduce')
     os.makedirs(save_dir, exist_ok=True)
-    model_name = 'NaiveControllerDemo'
-    save_replay_pth = join('data', 'OmniscientLearner', '%s_ReplayBuffer.pickle'%model_name)
-    save_record_pth = join('data', 'OmniscientLearner', '%s_Performance.csv'%model_name)
+    model_name = 'NaiveControllerDemo_Reproduce'
+    save_replay_pth = join(save_dir, '%s_ReplayBuffer.pickle'%model_name)
+    # save_record_pth = join('data', 'OmniscientLearner', '%s_Performance.csv'%model_name)
     save_trajall_pth = join(save_dir, '%s_TrajectoryRecords.csv' % model_name)
 
     # Environment
@@ -296,15 +296,15 @@ def naive_avoidance():
 
 def fine_tune_trained_model():
     # Modes
-    load_expert_buffer = False
+    load_expert_buffer = True
     save_replay_buffer = True
 
     # Paths
-    save_dir = join('data', 'OmniscientLearner')
+    save_dir = join('data', 'OmniscientLearner_Reproduce')
     os.makedirs(save_dir, exist_ok=True)
-    load_model_name = 'Finetuned8'
-    save_model_name = 'Finetuned9'
-    offline_data_pth = join(save_dir, 'NaiveController_ReplayBuffer.pickle')
+    load_model_name = 'Finetuned4'
+    save_model_name = 'Finetuned5'
+    offline_data_pth = join(save_dir, 'NaiveControllerDemo_Reproduce_ReplayBuffer.pickle')
     load_ckpt_pth = join(save_dir, '%s_CKPT.pt' % load_model_name)
     save_ckpt_pth = join(save_dir, '%s_CKPT.pt' % save_model_name)
     save_buffer_pth = join(save_dir, '%s_ReplayBuffer.pt' % save_model_name)
@@ -504,8 +504,8 @@ def evaluate_trained_model():
 
 def main():
     # naive_avoidance()
-    evaluate_trained_model()
-    # fine_tune_trained_model()
+    # evaluate_trained_model()
+    fine_tune_trained_model()
     # StartOnlineA2C()
     # SB_PPO_Train()
     # random_agent()

@@ -11,11 +11,11 @@ from lib.utils import read_pickle
 
 
 # Paths
-save_dir = join('data', 'OmniscientLearner')
-offline_data_pth = join(save_dir, 'NaiveController_ReplayBuffer.pickle')
-train_tag = '_clip-1.0'
-save_ckpt_pth = join(save_dir, 'OfflineTrained_CKPT%s.pt'%train_tag)
-loss_records_pth = join(save_dir, 'OfflineTrained_LOSS%s.png'%train_tag)
+save_dir = join('data', 'OmniscientLearner_Reproduce')
+
+offline_data_pth = join(save_dir, 'NaiveControllerDemo_Reproduce_ReplayBuffer.pickle')
+save_ckpt_pth = join(save_dir, 'OfflineTrained_Reproduce_CKPT.pt')
+loss_records_pth = join(save_dir, 'OfflineTrained_Reproduce_LOSS.png')
 
 # Paramters
 obs_dim = 7

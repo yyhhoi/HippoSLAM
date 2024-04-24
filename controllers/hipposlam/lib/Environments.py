@@ -9,12 +9,6 @@ from skimage.io import imsave
 from controller import Supervisor
 import gymnasium as gym
 
-from .Sequences import Sequences, StateDecoder, StateTeacher
-from .utils import save_pickle, read_pickle, Recorder
-from .vision import WebotImageConvertor, MobileNetEmbedder
-from .Embeddings import VAELearner, ContrastiveVAELearner
-
-
 class BreakRoom(Supervisor, gym.Env):
     def __init__(self, max_episode_steps=300, use_ds=True, spawn='all', goal='hard'):
         super().__init__()
