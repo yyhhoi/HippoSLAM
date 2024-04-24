@@ -172,11 +172,11 @@ def fine_tune_trained_model():
     # =============================================================================
     # Project identifiers
     experiment = 'ImitationLearningDemo'
-    load_run = 'Finetuned3'
-    save_run = 'Finetuned4'
+    load_run = 'Finetuned1'
+    save_run = 'Finetuned2'
 
     # Parameters of the run
-    load_expert_buffer = False
+    load_expert_buffer = True
     save_replay_buffer = True
     obs_dim = 7
     act_dim = 4
