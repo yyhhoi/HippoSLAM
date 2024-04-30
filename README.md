@@ -11,7 +11,7 @@ Leibold C. A model for navigation in unknown environments based on a reservoir o
 
 # How to use the repo?
 
-- For building the python environment and running the controller in Webots, see [How to run the controller scripts in Ubuntu](How to run the controller scripts in Ubuntu.md).
+- For building the python environment and running the controller in Webots, see [HowToRun_Ubuntu.md](HowToRun_Ubuntu.md).
 - After you have successfully run the controller scripts, you could try out other analysis scripts in [controllers/hipposlam](controllers/hipposlam). You might need the Webots python API. For that, you need to add the Webots library to your path. See [Webots documentation](https://cyberbotics.com/doc/guide/using-your-ide#pycharm) for more details. Alternatively, you can add the lines below at the beginning of the python scripts you are going to run:
 ```
 import sys
