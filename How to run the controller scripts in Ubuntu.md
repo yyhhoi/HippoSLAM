@@ -11,11 +11,9 @@ You can also use pyenv for creating a python environment.
 2. It is recommanded to choose the R2023b version, on which the project is developed.
 3. Download and install "webots_2023b_amd64.deb" (or other versions depending on individual cases).
 
-# Clone the Repo branch
+# Clone the Repo
 ```bash
-$ git clone https://github.com/yyhhoi/HippoSLAM
-$ cd HippoSLAM
-$ git checkout onlyhipposlam
+$ git clone https://github.com/yyhhoi/HippoSLA
 ```
 
 # Set up Conda environment
