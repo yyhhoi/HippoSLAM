@@ -8,6 +8,11 @@ from .utils import midedges
 
 
 def createX(R, F, K, stored_f, f_sigma):
+    """
+    Create X matrix based on R, F, K = R+L-1, stored_f
+    """
+
+
     X = np.zeros((F, K), dtype=int)
 
     for key, sigmalist in f_sigma.items():
@@ -33,6 +38,9 @@ class Sequences:
         self.reobserve = reobserve
 
     def step(self, f: list):
+        """
+        f could be a list of ints or strs. These are the feature nodes entering the camera view.
+        """
         self.clear_end_state()
         self.observe_f(f)
         self.propagate_sigma_update_X()
@@ -145,6 +153,8 @@ class MatrixJ:
         if far_ids is None:
             self.normalize_slice(sid, area=area)
         else:
+            # if far_ids are defined, the feature nodes representing the close and far objects will be normalized
+            # separately.
             allFids = set(i for i in range(F))
             close_ids = list(allFids.difference(far_ids))
             far_norm = np.sum(self.mat[sid, far_ids, :]) * 2

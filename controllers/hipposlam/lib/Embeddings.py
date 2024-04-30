@@ -22,13 +22,15 @@ def load_parametric_umap_model(load_umap_dir):
 
 def measure_umap_similarity(unew, umat, umins, umaxs):
     '''
+    Compare how similar the new embedding vector (unew) is to all previous old embedding vectors (umat), normalized
+    by the max and min of the whole embedding space (umins and umaxs).
 
     Parameters
     ----------
     unew : ndarray
-        Shape= (Embeds_dim, ). float32.
+        Shape= (Embeds_dim, ). float32. New embedding vector.
     umat : ndarray
-        Shape= (N, Embeds_dim). float32.
+        Shape= (N, Embeds_dim). float32. Storage of Umap embeddings.
     umins : ndarray
         Shape= (Embeds_dim, ). float32.
     umaxs : ndarray

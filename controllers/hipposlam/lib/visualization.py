@@ -1,10 +1,20 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+
+def set_arena(ax):
+    xbound = np.array((-16, 8)) * 1.1
+    ybound = np.array((-8, 16)) * 1.1
+    goal_loc = (-14.87, -7.38)
+
+    ax.set_xlim(*xbound)
+    ax.set_ylim(*ybound)
+    ax.scatter(*goal_loc, c='cyan', marker='D', zorder=3.1, s=100, alpha=0.5)
+    return ax
+
 def plot_spatial_specificity_base(ax0, ax1, xya, aedges, xbound, ybound, title='' ):
     ax0.quiver(xya[:, 0], xya[:, 1], np.cos(xya[:, 2]), np.sin(xya[:, 2]), scale=30)
-    ax0.set_xlim(*xbound)
-    ax0.set_ylim(*ybound)
+    set_arena(ax0)
     ax0.set_title(title)
     abins ,_  = np.histogram(xya[:, 2], bins=aedges)
     ax1.bar(aedges[1:]/2 + aedges[:-1]/2, abins, width=aedges[1] -aedges[0], fill=False)

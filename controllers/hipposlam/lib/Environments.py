@@ -361,10 +361,6 @@ class StateMapLearner(Forest):
                 if not only_close:
                     IDlist_out.append('%d_f' % (objid))
 
-        # id_list = []
-        # for c in closeIDlist:
-        #     for f in farIDlist:
-        #         id_list.append("%s_%s_%d"%(c, f, bumped))
 
         return IDlist_out
 
@@ -387,7 +383,9 @@ class StateMapLearner(Forest):
 
 
 class StateMapLearnerImageSaver(StateMapLearner):
-
+    """
+    A random agent for sampling images for training the UMAP.
+    """
     def __init__(self, R=5, L=20, maxt=1000, max_hipposlam_states=500,
                  save_hipposlam_pth=None, save_trajdata_pth=None, save_img_dir=None):
         super().__init__(R=R, L=L, maxt=maxt, max_hipposlam_states=max_hipposlam_states,
@@ -409,7 +407,6 @@ class StateMapLearnerImageSaver(StateMapLearner):
         if self.save_trajdata_pth:
             x, y, _ = super()._get_translation()
             a = super()._get_heading()
-            fsigma_to_store = copy.deepcopy({key: val for key, val in self.hipposeq.f_sigma.items() if len(val) > 0})
             self.SW.record(t=self.t, x=x, y=y, a=a, id_list=id_list, c=self.c)
 
         if (self.t % 5) == 0:
@@ -429,6 +426,12 @@ class StateMapLearnerImageSaver(StateMapLearner):
 
 
 class StateMapLearnerUmapEmbedding(StateMapLearner):
+    """
+    Learn to navigate using UMAP embeddings.
+    'UmapDirect': The similarities between UMAP embedding vectors are used to determine the state, without HippoSLAM
+    'RegressedToUmapState': Use HippoSLAM to predict the state learned by the UMAP embedding vectors.
+
+    """
     def __init__(self, agent_type, load_umap_dir, R=5, L=20, maxt=1000, max_hipposlam_states=1000,
                  save_hipposlam_pth=None, save_trajdata_pth=None):
 
@@ -476,6 +479,9 @@ class StateMapLearnerUmapEmbedding(StateMapLearner):
 
 class StateMapLearnerTaught(StateMapLearner):
 
+    """
+    Use the true states (StateTeacher) to represent the space.
+    """
     def __init__(self, R=5, L=10, maxt=1000, save_hipposlam_pth=None, save_trajdata_pth=None):
 
         super(StateMapLearnerTaught, self).__init__(R, L, maxt, 1,

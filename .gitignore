@@ -1,6 +1,7 @@
 /controllers/hipposlam/log/
 /controllers/hipposlam/plots/
 /controllers/hipposlam/data/
+/controllers/hipposlam/data*
 *__pycache__
 *.pyc
 .idea

@@ -12,7 +12,7 @@ def SB_PPO_Train(agent_type, simt=10000, experiment_dir='data/OnlineAnalysis'):
     # Parameters
     load_model = False  # After saving a model checkpoint, set it as True to load it.
     save_model = True
-    hippomap_learn = True  # If you think you don't need to create/learn more new state, set it as False.
+    hippomap_learn = True  # If you don't need to create/learn more new state in hipposlam, set it as False.
     load_model_name = ''  # Model checkpoint name that you want to load.
     save_model_name = 'PPO1'  # Model checkpoint name that you want to save as, for loading it and continue training next time.
 
@@ -40,10 +40,11 @@ def SB_PPO_Train(agent_type, simt=10000, experiment_dir='data/OnlineAnalysis'):
     else:
         raise NotImplementedError('Agent type should be either "UmapDirect", "RegressedToUmapState" or "RegressedToTrueState"')
 
-
+    # Information logging and checking the environment
     info_keywords = ('Nstates', 'last_r', 'terminated', 'truncated', 'stuck', 'fallen', 'timeout')
-    env = Monitor(env, save_record_pth, info_keywords=info_keywords)
+    env = Monitor(env, save_record_pth, info_keywords=info_keywords)  # Monitor for logging information at episode end
     check_env(env)
+
     # Load models
     if load_model:
         env.unwrapped.load_hipposlam(load_hipposlam_pth)
