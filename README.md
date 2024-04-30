@@ -3,9 +3,9 @@
 The work investigates a SLAM algorithm using the spatial representation supported by hippocampal sequences. 
 
 The idea originates from the following study: 
-```
+
 Leibold C. A model for navigation in unknown environments based on a reservoir of hippocampal sequences. Neural Networks. 2020 Apr;124:328–42.
-```
+
  
 
 
